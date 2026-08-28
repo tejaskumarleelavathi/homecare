@@ -1,0 +1,10 @@
+{
+  "name": "homecare-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "install:all": "npm install --prefix server && npm install --prefix web",
+    "build": "npm run build --prefix web",
+    "start": "npm start --prefix server"
+  }
+}
