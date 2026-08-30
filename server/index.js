@@ -31,7 +31,9 @@ function deleteCloudinaryImage(url) {
 }
 
 import {
-  db,
+  pool,
+  formatCategoryRow,
+  initDb,
   HOME_COLUMNS,
   WORK_STATUS_COLUMNS,
   WORK_CATEGORY_COLUMNS,
@@ -47,8 +49,7 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 4000;
 
-// Local-disk photo storage. Swap this out for cloud object storage later —
-// nothing outside this block needs to change since the DB just stores a URL.
+// Local-disk photo storage (fallback/temp)
 const UPLOADS_DIR = path.join(import.meta.dirname, "uploads");
 fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 app.use("/uploads", express.static(UPLOADS_DIR));
@@ -87,57 +88,65 @@ function normalizeHomeInput(body) {
   return { errors, values: { street, city, state, zip_code, emails, notes } };
 }
 
-app.get("/api/homes", (_req, res) => {
-  const rows = db
-    .prepare(`SELECT ${HOME_COLUMNS.join(", ")} FROM home ORDER BY home_id`)
-    .all();
-  res.json(rows);
+app.get("/api/homes", async (_req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT ${HOME_COLUMNS.join(", ")} FROM home ORDER BY home_id`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ errors: [err.message] });
+  }
 });
 
-app.post("/api/homes", (req, res) => {
+app.post("/api/homes", async (req, res) => {
   const { errors, values } = normalizeHomeInput(req.body);
   if (errors.length > 0) {
     return res.status(400).json({ errors });
   }
 
+  const client = await pool.connect();
   try {
-    db.exec("BEGIN");
+    await client.query("BEGIN");
 
-    const result = db
-      .prepare(
-        `INSERT INTO home (street, city, state, zip_code, emails, notes)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-      )
-      .run(
+    const insertResult = await client.query(
+      `INSERT INTO home (street, city, state, zip_code, emails, notes)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING home_id`,
+      [
         values.street,
         values.city,
         values.state,
         values.zip_code,
         values.emails,
         values.notes,
-      );
+      ]
+    );
+    const newHomeId = insertResult.rows[0].home_id;
 
     // Every home gets its first inspection auto-scheduled for the next day.
-    scheduleInspection(result.lastInsertRowid, addDaysStr(todayStr(), 1), {
+    await scheduleInspection(newHomeId, addDaysStr(todayStr(), 1), {
       isOriginal: true,
     });
 
-    db.exec("COMMIT");
+    await client.query("COMMIT");
 
-    const row = db
-      .prepare(`SELECT ${HOME_COLUMNS.join(", ")} FROM home WHERE home_id = ?`)
-      .get(result.lastInsertRowid);
-    res.status(201).json(row);
+    const selectResult = await pool.query(
+      `SELECT ${HOME_COLUMNS.join(", ")} FROM home WHERE home_id = $1`,
+      [newHomeId]
+    );
+    res.status(201).json(selectResult.rows[0]);
   } catch (err) {
-    db.exec("ROLLBACK");
+    await client.query("ROLLBACK");
     res.status(400).json({ errors: [err.message] });
+  } finally {
+    client.release();
   }
 });
 
-app.put("/api/homes/:id", (req, res) => {
+app.put("/api/homes/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const existing = db.prepare("SELECT home_id FROM home WHERE home_id = ?").get(id);
-  if (!existing) {
+  const existingResult = await pool.query("SELECT home_id FROM home WHERE home_id = $1", [id]);
+  if (existingResult.rows.length === 0) {
     return res.status(404).json({ errors: ["Home not found."] });
   }
 
@@ -147,38 +156,40 @@ app.put("/api/homes/:id", (req, res) => {
   }
 
   try {
-    db.prepare(
+    await pool.query(
       `UPDATE home
-       SET street = ?, city = ?, state = ?, zip_code = ?, emails = ?, notes = ?,
+       SET street = $1, city = $2, state = $3, zip_code = $4, emails = $5, notes = $6,
            updated_at = CURRENT_TIMESTAMP
-       WHERE home_id = ?`,
-    ).run(
-      values.street,
-      values.city,
-      values.state,
-      values.zip_code,
-      values.emails,
-      values.notes,
-      id,
+       WHERE home_id = $7`,
+      [
+        values.street,
+        values.city,
+        values.state,
+        values.zip_code,
+        values.emails,
+        values.notes,
+        id,
+      ]
     );
 
-    const row = db
-      .prepare(`SELECT ${HOME_COLUMNS.join(", ")} FROM home WHERE home_id = ?`)
-      .get(id);
-    res.json(row);
+    const selectResult = await pool.query(
+      `SELECT ${HOME_COLUMNS.join(", ")} FROM home WHERE home_id = $1`,
+      [id]
+    );
+    res.json(selectResult.rows[0]);
   } catch (err) {
     res.status(400).json({ errors: [err.message] });
   }
 });
 
-app.delete("/api/homes/:id", (req, res) => {
+app.delete("/api/homes/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const existing = db.prepare("SELECT home_id FROM home WHERE home_id = ?").get(id);
-  if (!existing) {
+  const existingResult = await pool.query("SELECT home_id FROM home WHERE home_id = $1", [id]);
+  if (existingResult.rows.length === 0) {
     return res.status(404).json({ errors: ["Home not found."] });
   }
 
-  db.prepare("DELETE FROM home WHERE home_id = ?").run(id);
+  await pool.query("DELETE FROM home WHERE home_id = $1", [id]);
   res.status(204).end();
 });
 
@@ -193,46 +204,53 @@ function normalizeWorkStatusInput(body) {
   return { errors, values: { status_name, status_description } };
 }
 
-function friendlySqliteError(err) {
-  if (err.message.includes("UNIQUE constraint failed: work_status.status_name")) {
+function friendlyPostgresError(err) {
+  if (err.message && err.message.includes("unique constraint") && err.message.includes("status_name")) {
     return "A status with that name already exists.";
   }
   return err.message;
 }
 
-app.get("/api/work-statuses", (_req, res) => {
-  const rows = db
-    .prepare(`SELECT ${WORK_STATUS_COLUMNS.join(", ")} FROM work_status ORDER BY work_status_id`)
-    .all();
-  res.json(rows);
+app.get("/api/work-statuses", async (_req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT ${WORK_STATUS_COLUMNS.join(", ")} FROM work_status ORDER BY work_status_id`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ errors: [err.message] });
+  }
 });
 
-app.post("/api/work-statuses", (req, res) => {
+app.post("/api/work-statuses", async (req, res) => {
   const { errors, values } = normalizeWorkStatusInput(req.body);
   if (errors.length > 0) {
     return res.status(400).json({ errors });
   }
 
   try {
-    const result = db
-      .prepare(`INSERT INTO work_status (status_name, status_description) VALUES (?, ?)`)
-      .run(values.status_name, values.status_description);
+    const insertResult = await pool.query(
+      `INSERT INTO work_status (status_name, status_description) VALUES ($1, $2) RETURNING work_status_id`,
+      [values.status_name, values.status_description]
+    );
+    const newStatusId = insertResult.rows[0].work_status_id;
 
-    const row = db
-      .prepare(`SELECT ${WORK_STATUS_COLUMNS.join(", ")} FROM work_status WHERE work_status_id = ?`)
-      .get(result.lastInsertRowid);
-    res.status(201).json(row);
+    const selectResult = await pool.query(
+      `SELECT ${WORK_STATUS_COLUMNS.join(", ")} FROM work_status WHERE work_status_id = $1`,
+      [newStatusId]
+    );
+    res.status(201).json(selectResult.rows[0]);
   } catch (err) {
-    res.status(400).json({ errors: [friendlySqliteError(err)] });
+    res.status(400).json({ errors: [friendlyPostgresError(err)] });
   }
 });
 
-app.put("/api/work-statuses/:id", (req, res) => {
+app.put("/api/work-statuses/:id", async (req, res) => {
   const id = Number(req.params.id);
-  const existing = db
-    .prepare("SELECT work_status_id FROM work_status WHERE work_status_id = ?")
-    .get(id);
-  if (!existing) {
+  const existingResult = await pool.query(
+    "SELECT work_status_id FROM work_status WHERE work_status_id = $1", [id]
+  );
+  if (existingResult.rows.length === 0) {
     return res.status(404).json({ errors: ["Status not found."] });
   }
 
@@ -242,34 +260,37 @@ app.put("/api/work-statuses/:id", (req, res) => {
   }
 
   try {
-    db.prepare(
+    await pool.query(
       `UPDATE work_status
-       SET status_name = ?, status_description = ?, updated_at = CURRENT_TIMESTAMP
-       WHERE work_status_id = ?`,
-    ).run(values.status_name, values.status_description, id);
+       SET status_name = $1, status_description = $2, updated_at = CURRENT_TIMESTAMP
+       WHERE work_status_id = $3`,
+      [values.status_name, values.status_description, id]
+    );
 
-    const row = db
-      .prepare(`SELECT ${WORK_STATUS_COLUMNS.join(", ")} FROM work_status WHERE work_status_id = ?`)
-      .get(id);
-    res.json(row);
+    const selectResult = await pool.query(
+      `SELECT ${WORK_STATUS_COLUMNS.join(", ")} FROM work_status WHERE work_status_id = $1`,
+      [id]
+    );
+    res.json(selectResult.rows[0]);
   } catch (err) {
-    res.status(400).json({ errors: [friendlySqliteError(err)] });
+    res.status(400).json({ errors: [friendlyPostgresError(err)] });
   }
 });
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
-function homeExists(homeId) {
-  return Boolean(db.prepare("SELECT home_id FROM home WHERE home_id = ?").get(homeId));
+async function homeExists(homeId) {
+  const res = await pool.query("SELECT home_id FROM home WHERE home_id = $1", [homeId]);
+  return res.rows.length > 0;
 }
 
-function getInspectionRows(homeId, dateStr) {
-  return db
-    .prepare(
-      `SELECT ${WORK_CATEGORY_COLUMNS.join(", ")} FROM work_category
-       WHERE home_id = ? AND date = ? ORDER BY category_name, category_item`,
-    )
-    .all(homeId, dateStr);
+async function getInspectionRows(homeId, dateStr) {
+  const res = await pool.query(
+    `SELECT ${WORK_CATEGORY_COLUMNS.join(", ")} FROM work_category
+     WHERE home_id = $1 AND date = $2 ORDER BY category_name, category_item`,
+    [homeId, dateStr]
+  );
+  return res.rows.map(formatCategoryRow);
 }
 
 function buildInspectionView(dateStr, items) {
@@ -290,15 +311,14 @@ function buildInspectionView(dateStr, items) {
     canEditItems: hasItems && !isFuture,
     canDeleteDay: hasItems && !(isFuture && isOriginalProtected),
     canRescheduleDay: hasItems && isFuture,
-    // Allowed for today (pick any future date) and future empty dates
-    // (pre-fill that date) — never for a past date with nothing scheduled.
     canScheduleNew: !hasItems && !isPast,
   };
 }
 
-app.get("/api/homes/:homeId/inspections", (req, res) => {
+app.get("/api/homes/:homeId/inspections", async (req, res) => {
   const homeId = Number(req.params.homeId);
-  if (!homeExists(homeId)) {
+  const exists = await homeExists(homeId);
+  if (!exists) {
     return res.status(404).json({ errors: ["Home not found."] });
   }
 
@@ -306,13 +326,14 @@ app.get("/api/homes/:homeId/inspections", (req, res) => {
     ? req.query.date
     : todayStr();
 
-  const items = getInspectionRows(homeId, dateStr);
+  const items = await getInspectionRows(homeId, dateStr);
   res.json(buildInspectionView(dateStr, items));
 });
 
-app.post("/api/homes/:homeId/inspections", (req, res) => {
+app.post("/api/homes/:homeId/inspections", async (req, res) => {
   const homeId = Number(req.params.homeId);
-  if (!homeExists(homeId)) {
+  const exists = await homeExists(homeId);
+  if (!exists) {
     return res.status(404).json({ errors: ["Home not found."] });
   }
 
@@ -323,22 +344,24 @@ app.post("/api/homes/:homeId/inspections", (req, res) => {
   if (dateStr <= todayStr()) {
     return res.status(400).json({ errors: ["You can only schedule a future date."] });
   }
-  if (getInspectionRows(homeId, dateStr).length > 0) {
+  const existingRows = await getInspectionRows(homeId, dateStr);
+  if (existingRows.length > 0) {
     return res.status(409).json({ errors: ["This date already has an inspection scheduled."] });
   }
 
-  const items = scheduleInspection(homeId, dateStr, { isOriginal: false });
+  const items = await scheduleInspection(homeId, dateStr, { isOriginal: false });
   res.status(201).json(buildInspectionView(dateStr, items));
 });
 
-app.put("/api/homes/:homeId/inspections/:date/reschedule", (req, res) => {
+app.put("/api/homes/:homeId/inspections/:date/reschedule", async (req, res) => {
   const homeId = Number(req.params.homeId);
   const dateStr = req.params.date;
-  if (!homeExists(homeId)) {
+  const exists = await homeExists(homeId);
+  if (!exists) {
     return res.status(404).json({ errors: ["Home not found."] });
   }
 
-  const existingItems = getInspectionRows(homeId, dateStr);
+  const existingItems = await getInspectionRows(homeId, dateStr);
   if (existingItems.length === 0) {
     return res.status(404).json({ errors: ["No inspection scheduled for that date."] });
   }
@@ -353,27 +376,30 @@ app.put("/api/homes/:homeId/inspections/:date/reschedule", (req, res) => {
   if (newDateStr <= todayStr()) {
     return res.status(400).json({ errors: ["The new date must be in the future."] });
   }
-  if (getInspectionRows(homeId, newDateStr).length > 0) {
+  const newDateExistingRows = await getInspectionRows(homeId, newDateStr);
+  if (newDateExistingRows.length > 0) {
     return res.status(409).json({ errors: ["That date already has an inspection scheduled."] });
   }
 
-  db.prepare(
-    `UPDATE work_category SET date = ?, updated_at = CURRENT_TIMESTAMP
-     WHERE home_id = ? AND date = ?`,
-  ).run(newDateStr, homeId, dateStr);
+  await pool.query(
+    `UPDATE work_category SET date = $1, updated_at = CURRENT_TIMESTAMP
+     WHERE home_id = $2 AND date = $3`,
+    [newDateStr, homeId, dateStr]
+  );
 
-  const items = getInspectionRows(homeId, newDateStr);
+  const items = await getInspectionRows(homeId, newDateStr);
   res.json(buildInspectionView(newDateStr, items));
 });
 
-app.delete("/api/homes/:homeId/inspections/:date", (req, res) => {
+app.delete("/api/homes/:homeId/inspections/:date", async (req, res) => {
   const homeId = Number(req.params.homeId);
   const dateStr = req.params.date;
-  if (!homeExists(homeId)) {
+  const exists = await homeExists(homeId);
+  if (!exists) {
     return res.status(404).json({ errors: ["Home not found."] });
   }
 
-  const items = getInspectionRows(homeId, dateStr);
+  const items = await getInspectionRows(homeId, dateStr);
   if (items.length === 0) {
     return res.status(404).json({ errors: ["No inspection scheduled for that date."] });
   }
@@ -387,34 +413,36 @@ app.delete("/api/homes/:homeId/inspections/:date", (req, res) => {
     });
   }
 
-  db.prepare("DELETE FROM work_category WHERE home_id = ? AND date = ?").run(homeId, dateStr);
+  await pool.query("DELETE FROM work_category WHERE home_id = $1 AND date = $2", [homeId, dateStr]);
   res.status(204).end();
 });
 
-app.put("/api/homes/:homeId/inspections/:date/items/:workCategoryId", (req, res) => {
+app.put("/api/homes/:homeId/inspections/:date/items/:workCategoryId", async (req, res) => {
   const homeId = Number(req.params.homeId);
   const dateStr = req.params.date;
   const workCategoryId = Number(req.params.workCategoryId);
 
-  const item = db
-    .prepare(
-      `SELECT ${WORK_CATEGORY_COLUMNS.join(", ")} FROM work_category
-       WHERE work_category_id = ? AND home_id = ? AND date = ?`,
-    )
-    .get(workCategoryId, homeId, dateStr);
-  if (!item) {
+  const itemResult = await pool.query(
+    `SELECT ${WORK_CATEGORY_COLUMNS.join(", ")} FROM work_category
+     WHERE work_category_id = $1 AND home_id = $2 AND date = $3`,
+    [workCategoryId, homeId, dateStr]
+  );
+  if (itemResult.rows.length === 0) {
     return res.status(404).json({ errors: ["Inspection item not found."] });
   }
+  const item = formatCategoryRow(itemResult.rows[0]);
+
   if (dateStr > todayStr()) {
     return res.status(403).json({ errors: ["Future inspections can't be edited yet."] });
   }
 
   const work_status_id = req.body?.work_status_id ?? null;
   if (work_status_id !== null) {
-    const statusExists = db
-      .prepare("SELECT work_status_id FROM work_status WHERE work_status_id = ?")
-      .get(work_status_id);
-    if (!statusExists) {
+    const statusExistsResult = await pool.query(
+      "SELECT work_status_id FROM work_status WHERE work_status_id = $1",
+      [work_status_id]
+    );
+    if (statusExistsResult.rows.length === 0) {
       return res.status(400).json({ errors: ["Unknown status."] });
     }
   }
@@ -423,12 +451,13 @@ app.put("/api/homes/:homeId/inspections/:date/items/:workCategoryId", (req, res)
   const work_photo_pah_2 = req.body?.work_photo_pah_2 ?? item.work_photo_pah_2 ?? "";
   const work_photo_pah_3 = req.body?.work_photo_pah_3 ?? item.work_photo_pah_3 ?? "";
 
-  db.prepare(
+  await pool.query(
     `UPDATE work_category
-     SET work_status_id = ?, work_photo_pah_1 = ?, work_photo_pah_2 = ?, work_photo_pah_3 = ?,
+     SET work_status_id = $1, work_photo_pah_1 = $2, work_photo_pah_2 = $3, work_photo_pah_3 = $4,
          updated_at = CURRENT_TIMESTAMP
-     WHERE work_category_id = ?`,
-  ).run(work_status_id, work_photo_pah_1, work_photo_pah_2, work_photo_pah_3, workCategoryId);
+     WHERE work_category_id = $5`,
+    [work_status_id, work_photo_pah_1, work_photo_pah_2, work_photo_pah_3, workCategoryId]
+  );
 
   // A photo field that changed away from a locally-stored file or cloud storage —
   // remove the now-orphaned upload.
@@ -446,10 +475,11 @@ app.put("/api/homes/:homeId/inspections/:date/items/:workCategoryId", (req, res)
     }
   }
 
-  const updated = db
-    .prepare(`SELECT ${WORK_CATEGORY_COLUMNS.join(", ")} FROM work_category WHERE work_category_id = ?`)
-    .get(workCategoryId);
-  res.json(updated);
+  const selectResult = await pool.query(
+    `SELECT ${WORK_CATEGORY_COLUMNS.join(", ")} FROM work_category WHERE work_category_id = $1`,
+    [workCategoryId]
+  );
+  res.json(formatCategoryRow(selectResult.rows[0]));
 });
 
 const PHOTO_SLOT_COLUMNS = {
@@ -475,16 +505,17 @@ app.post(
       return res.status(400).json({ errors: ["Invalid photo slot."] });
     }
 
-    const item = db
-      .prepare(
-        `SELECT ${WORK_CATEGORY_COLUMNS.join(", ")} FROM work_category
-         WHERE work_category_id = ? AND home_id = ? AND date = ?`,
-      )
-      .get(workCategoryId, homeId, dateStr);
-    if (!item) {
+    const itemResult = await pool.query(
+      `SELECT ${WORK_CATEGORY_COLUMNS.join(", ")} FROM work_category
+       WHERE work_category_id = $1 AND home_id = $2 AND date = $3`,
+      [workCategoryId, homeId, dateStr]
+    );
+    if (itemResult.rows.length === 0) {
       fs.unlink(req.file.path, () => {});
       return res.status(404).json({ errors: ["Inspection item not found."] });
     }
+    const item = formatCategoryRow(itemResult.rows[0]);
+
     if (dateStr > todayStr()) {
       fs.unlink(req.file.path, () => {});
       return res.status(403).json({ errors: ["Future inspections can't be edited yet."] });
@@ -497,9 +528,10 @@ app.post(
       const url = result.secure_url;
       const previous = item[column];
 
-      db.prepare(
-        `UPDATE work_category SET ${column} = ?, updated_at = CURRENT_TIMESTAMP WHERE work_category_id = ?`,
-      ).run(url, workCategoryId);
+      await pool.query(
+        `UPDATE work_category SET ${column} = $1, updated_at = CURRENT_TIMESTAMP WHERE work_category_id = $2`,
+        [url, workCategoryId]
+      );
 
       // Clean up local temp upload file
       fs.unlink(req.file.path, () => {});
@@ -512,10 +544,11 @@ app.post(
         }
       }
 
-      const updated = db
-        .prepare(`SELECT ${WORK_CATEGORY_COLUMNS.join(", ")} FROM work_category WHERE work_category_id = ?`)
-        .get(workCategoryId);
-      res.json(updated);
+      const selectResult = await pool.query(
+        `SELECT ${WORK_CATEGORY_COLUMNS.join(", ")} FROM work_category WHERE work_category_id = $1`,
+        [workCategoryId]
+      );
+      res.json(formatCategoryRow(selectResult.rows[0]));
     } catch (uploadError) {
       fs.unlink(req.file.path, () => {});
       console.error("Cloudinary upload error:", uploadError);
@@ -539,7 +572,9 @@ app.use((err, _req, res, _next) => {
   res.status(400).json({ errors: [err.message] });
 });
 
-const backfilledCount = backfillMissingSchedules();
+// Initialize database tables and seed values asynchronously, then start server
+await initDb();
+const backfilledCount = await backfillMissingSchedules();
 if (backfilledCount > 0) {
   console.log(`Backfilled next-day inspection schedules for ${backfilledCount} home(s).`);
 }

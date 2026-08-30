@@ -1,0 +1,162 @@
+[
+  {
+    "category_name": "Electrical and Appliances",
+    "category_item": "Dishwasher",
+    "category_description": "Look at shut offs for leaks, mildew or mold, run dishwasher"
+  },
+  {
+    "category_name": "Electrical and Appliances",
+    "category_item": "GFI outlets",
+    "category_description": "Test for proper operation"
+  },
+  {
+    "category_name": "Electrical and Appliances",
+    "category_item": "Garbage Disposals",
+    "category_description": "Clean blades by grinding ice. Freshen up by grinding citrus rinds and baking soda"
+  },
+  {
+    "category_name": "Electrical and Appliances",
+    "category_item": "Heating and cooling systems",
+    "category_description": "Clean and replace filters if necessary. Check thermostats to be set and working correctly"
+  },
+  {
+    "category_name": "Electrical and Appliances",
+    "category_item": "Refrigerator/Ice makers",
+    "category_description": "Open door and make sure they are working correctly and not leaking and run ice maker"
+  },
+  {
+    "category_name": "Electrical and Appliances",
+    "category_item": "Smoke detector",
+    "category_description": "Test for proper operation and replace batteries if necessary"
+  },
+  {
+    "category_name": "Electrical and Appliances",
+    "category_item": "Sub Panel",
+    "category_description": "Open panels and make sure no breakers are tripped"
+  },
+  {
+    "category_name": "Electrical and Appliances",
+    "category_item": "Washer/Dryer",
+    "category_description": "If vented through the roof clean out the screens. Check for blockage. Check for leaks"
+  },
+  {
+    "category_name": "Exterior",
+    "category_item": "Exterior decks/Shellcrete, tile",
+    "category_description": "Rinse off. If shellcrete or natural stone it needs sealed once a year"
+  },
+  {
+    "category_name": "Exterior",
+    "category_item": "Foundation",
+    "category_description": "Inspect visible areas, vents, and ducts for cracks, leaks, or blockages"
+  },
+  {
+    "category_name": "Exterior",
+    "category_item": "Gates",
+    "category_description": "Check for dragging or obstructions on track. Lube once a year"
+  },
+  {
+    "category_name": "Exterior",
+    "category_item": "Gutters and downspouts",
+    "category_description": "Visually check once a month, clear gutters yearly if recommended"
+  },
+  {
+    "category_name": "Exterior",
+    "category_item": "Landscaping/Irrigation",
+    "category_description": "Check for signs of broken sprinkler heads. Look for proper drainage and erosion"
+  },
+  {
+    "category_name": "Exterior",
+    "category_item": "Outdoor Kitchen Area",
+    "category_description": "Check for cracks in stone and make note of any oxidization and rust"
+  },
+  {
+    "category_name": "Exterior",
+    "category_item": "Paint – Partial Care",
+    "category_description": "Check for gaps around windows and doors. Keep a list for yearly"
+  },
+  {
+    "category_name": "Exterior",
+    "category_item": "Pest Control",
+    "category_description": "Look for types of bugs, make note for owner, and/or call Pest Control to spray"
+  },
+  {
+    "category_name": "Exterior",
+    "category_item": "Roofs – Inspection",
+    "category_description": "Check valleys to be clear, water can move freely. Clear roof as needed with leaf blower, broom"
+  },
+  {
+    "category_name": "Exterior",
+    "category_item": "Windows and doors",
+    "category_description": "Look for leaks, torn weather strips, operate windows and door locks"
+  },
+  {
+    "category_name": "Interior",
+    "category_item": "A/C system – Partial Care",
+    "category_description": "Check thermostats. Check filters. Check copper lines and pan for condensation"
+  },
+  {
+    "category_name": "Interior",
+    "category_item": "Ceiling penetrations",
+    "category_description": "Look around can light, speakers, and bath fan penetrations for signs of mold"
+  },
+  {
+    "category_name": "Interior",
+    "category_item": "Elevator",
+    "category_description": "Use elevator to make sure it is working. Check phone line inside cab. Light bulb replacement"
+  },
+  {
+    "category_name": "Interior",
+    "category_item": "Garage door",
+    "category_description": "Lubricate hardware. Replace battery on keypad as needed"
+  },
+  {
+    "category_name": "Interior",
+    "category_item": "Interior doors",
+    "category_description": "Lubricate hinges as needed"
+  },
+  {
+    "category_name": "Interior",
+    "category_item": "Paint",
+    "category_description": "Check for shrinkage in crown, base, casings and window sills. Keep a list for yearly"
+  },
+  {
+    "category_name": "Interior",
+    "category_item": "Tile floors, walls, showers",
+    "category_description": "Check for cracks in grout. Keep a list for yearly"
+  },
+  {
+    "category_name": "Interior",
+    "category_item": "Window and door tracks",
+    "category_description": "Check to see if sweep holes are open. Clean out dirt and dust"
+  },
+  {
+    "category_name": "Interior",
+    "category_item": "Wood cabinets and trim",
+    "category_description": "Look for cracks from settlement and shrinkage"
+  },
+  {
+    "category_name": "Plumbing",
+    "category_item": "Faucets, tubs and shower heads",
+    "category_description": "Turn water on, look under cabinets at shut offs and drains for leaks"
+  },
+  {
+    "category_name": "Plumbing",
+    "category_item": "Main visible drain pipes",
+    "category_description": "Inspect visible pipes for leaks. Locate clean outs for future use"
+  },
+  {
+    "category_name": "Plumbing",
+    "category_item": "Pool Equipment",
+    "category_description": "Visually inspect pool equipment and turn heater on to ensure everything functions properly"
+  },
+  {
+    "category_name": "Plumbing",
+    "category_item": "Toilets",
+    "category_description": "Check for stability and leaks. Look inside for rings, quick clean flush"
+  },
+  {
+    "category_name": "Plumbing",
+    "category_item": "Water Heater",
+    "category_description": "Visually inspect water heater and ensure no leaks or malfunctions"
+  }
+]
