@@ -80,7 +80,7 @@ export function formatCategoryRow(row) {
   };
 }
 
-export async function scheduleInspection(homeId, dateStr, { isOriginal = false } = {}) {
+export async function scheduleInspection(homeId, dateStr, { isOriginal = false, client = pool } = {}) {
   const template = getTemplateItems();
   const pendingStatusId = await getPendingStatusId();
 
@@ -105,13 +105,13 @@ export async function scheduleInspection(homeId, dateStr, { isOriginal = false }
     paramIndex += 7;
   }
 
-  await pool.query(`
+  await client.query(`
     INSERT INTO work_category
       (home_id, category_name, category_item, category_description, date, work_status_id, is_original_schedule)
     VALUES ${valuePlaceholders.join(", ")}
   `, values);
 
-  const res = await pool.query(`
+  const res = await client.query(`
     SELECT ${WORK_CATEGORY_COLUMNS.join(", ")} FROM work_category
     WHERE home_id = $1 AND date = $2 ORDER BY work_category_id
   `, [homeId, dateStr]);

@@ -126,6 +126,7 @@ app.post("/api/homes", async (req, res) => {
     // Every home gets its first inspection auto-scheduled for the next day.
     await scheduleInspection(newHomeId, addDaysStr(todayStr(), 1), {
       isOriginal: true,
+      client,
     });
 
     await client.query("COMMIT");
