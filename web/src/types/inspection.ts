@@ -9,6 +9,7 @@ export interface InspectionItem {
   work_photo_pah_1: string | null;
   work_photo_pah_2: string | null;
   work_photo_pah_3: string | null;
+  notes: string | null;
   is_original_schedule: number;
   created_at: string;
   updated_at: string;
@@ -33,4 +34,5 @@ export interface InspectionItemUpdate {
   work_photo_pah_1?: string;
   work_photo_pah_2?: string;
   work_photo_pah_3?: string;
+  notes?: string;
 }

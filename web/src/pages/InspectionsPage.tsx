@@ -31,6 +31,7 @@ import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -184,6 +185,7 @@ export function InspectionsPage() {
         work_photo_pah_1: merged.work_photo_pah_1 ?? "",
         work_photo_pah_2: merged.work_photo_pah_2 ?? "",
         work_photo_pah_3: merged.work_photo_pah_3 ?? "",
+        notes: merged.notes ?? "",
       });
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Couldn't save that change.");
@@ -385,13 +387,14 @@ export function InspectionsPage() {
                       <TableHead>Item</TableHead>
                       <TableHead className="w-[180px]">Status</TableHead>
                       <TableHead>Photos</TableHead>
+                      <TableHead className="w-[250px]">Notes</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {groupedItems.map(([categoryName, items]) => (
                       <Fragment key={categoryName}>
                         <TableRow key={`group-${categoryName}`} className="bg-muted/40 hover:bg-muted/40">
-                          <TableCell colSpan={3} className="py-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                          <TableCell colSpan={4} className="py-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                             {categoryName}
                           </TableCell>
                         </TableRow>
@@ -453,6 +456,28 @@ export function InspectionsPage() {
                                   ),
                                 )}
                               </div>
+                            </TableCell>
+                            <TableCell>
+                              {dayView.canEditItems ? (
+                                <>
+                                  <div className="print:hidden">
+                                    <Textarea
+                                      value={item.notes ?? ""}
+                                      onChange={(e) => updateLocalItem(item.work_category_id, { notes: e.target.value })}
+                                      onBlur={(e) => commitItemUpdate(item, { notes: e.target.value })}
+                                      placeholder="Add notes..."
+                                      className="w-full text-xs min-h-[38px] h-[38px] resize-none"
+                                    />
+                                  </div>
+                                  <span className="hidden print:inline text-xs whitespace-pre-wrap">
+                                    {item.notes || "—"}
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="text-xs text-muted-foreground whitespace-pre-wrap">
+                                  {item.notes || "—"}
+                                </span>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))}

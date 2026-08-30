@@ -41,6 +41,7 @@ export const WORK_CATEGORY_COLUMNS = [
   "work_photo_pah_1",
   "work_photo_pah_2",
   "work_photo_pah_3",
+  "notes",
   "is_original_schedule",
   "created_at",
   "updated_at",
@@ -165,10 +166,16 @@ export async function initDb() {
       work_photo_pah_1 TEXT,
       work_photo_pah_2 TEXT,
       work_photo_pah_3 TEXT,
+      notes TEXT,
       is_original_schedule INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
+  `);
+
+  // Migration: Add notes column if table already existed without it
+  await pool.query(`
+    ALTER TABLE work_category ADD COLUMN IF NOT EXISTS notes TEXT;
   `);
 
   // Seed statuses

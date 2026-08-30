@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { CalendarClock, Loader2 } from "lucide-react";
 
-import { addDaysStr, formatDateStr, fromDateStr, todayStr, toDateStr } from "@/lib/date";
+import { formatDateStr, fromDateStr, todayStr, toDateStr } from "@/lib/date";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -18,7 +18,7 @@ interface SchedulePopoverProps {
 }
 
 export function SchedulePopover({ label, defaultDate, onConfirm, variant = "default" }: SchedulePopoverProps) {
-  const earliest = addDaysStr(todayStr(), 1);
+  const earliest = todayStr();
   const [open, setOpen] = useState(false);
   const [selected, setSelected] = useState(
     defaultDate && defaultDate >= earliest ? defaultDate : earliest,

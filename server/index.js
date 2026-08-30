@@ -341,8 +341,8 @@ app.post("/api/homes/:homeId/inspections", async (req, res) => {
   if (typeof dateStr !== "string" || !DATE_RE.test(dateStr)) {
     return res.status(400).json({ errors: ["A valid date is required."] });
   }
-  if (dateStr <= todayStr()) {
-    return res.status(400).json({ errors: ["You can only schedule a future date."] });
+  if (dateStr < todayStr()) {
+    return res.status(400).json({ errors: ["You cannot schedule an inspection for a past date."] });
   }
   const existingRows = await getInspectionRows(homeId, dateStr);
   if (existingRows.length > 0) {
@@ -365,16 +365,16 @@ app.put("/api/homes/:homeId/inspections/:date/reschedule", async (req, res) => {
   if (existingItems.length === 0) {
     return res.status(404).json({ errors: ["No inspection scheduled for that date."] });
   }
-  if (dateStr <= todayStr()) {
-    return res.status(400).json({ errors: ["Only future inspections can be rescheduled."] });
+  if (dateStr < todayStr()) {
+    return res.status(400).json({ errors: ["Only current or future inspections can be rescheduled."] });
   }
 
   const newDateStr = req.body?.date;
   if (typeof newDateStr !== "string" || !DATE_RE.test(newDateStr)) {
     return res.status(400).json({ errors: ["A valid new date is required."] });
   }
-  if (newDateStr <= todayStr()) {
-    return res.status(400).json({ errors: ["The new date must be in the future."] });
+  if (newDateStr < todayStr()) {
+    return res.status(400).json({ errors: ["The new date cannot be in the past."] });
   }
   const newDateExistingRows = await getInspectionRows(homeId, newDateStr);
   if (newDateExistingRows.length > 0) {
@@ -450,13 +450,14 @@ app.put("/api/homes/:homeId/inspections/:date/items/:workCategoryId", async (req
   const work_photo_pah_1 = req.body?.work_photo_pah_1 ?? item.work_photo_pah_1 ?? "";
   const work_photo_pah_2 = req.body?.work_photo_pah_2 ?? item.work_photo_pah_2 ?? "";
   const work_photo_pah_3 = req.body?.work_photo_pah_3 ?? item.work_photo_pah_3 ?? "";
+  const notes = req.body?.notes ?? item.notes ?? "";
 
   await pool.query(
     `UPDATE work_category
      SET work_status_id = $1, work_photo_pah_1 = $2, work_photo_pah_2 = $3, work_photo_pah_3 = $4,
-         updated_at = CURRENT_TIMESTAMP
-     WHERE work_category_id = $5`,
-    [work_status_id, work_photo_pah_1, work_photo_pah_2, work_photo_pah_3, workCategoryId]
+         notes = $5, updated_at = CURRENT_TIMESTAMP
+     WHERE work_category_id = $6`,
+    [work_status_id, work_photo_pah_1, work_photo_pah_2, work_photo_pah_3, notes, workCategoryId]
   );
 
   // A photo field that changed away from a locally-stored file or cloud storage —
