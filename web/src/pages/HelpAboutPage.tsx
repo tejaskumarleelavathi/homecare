@@ -16,6 +16,7 @@ import {
   Home as HomeIcon,
   Info,
   LifeBuoy,
+  Loader2,
   Mail,
   MessageSquare,
   Phone,
@@ -25,6 +26,7 @@ import {
   Sparkles,
   Send,
 } from "lucide-react";
+import { submitSupportTicketApi, ApiError } from "@/lib/api";
 
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -172,6 +174,8 @@ export function HelpAboutPage() {
   const [supportTopic, setSupportTopic] = useState("general");
   const [supportMessage, setSupportMessage] = useState("");
   const [ticketSubmitted, setTicketSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   const filteredGuides = MANUAL_GUIDES.filter((guide) => {
     if (!searchQuery.trim()) return true;
@@ -184,15 +188,29 @@ export function HelpAboutPage() {
     );
   });
 
-  function handleSupportSubmit(e: React.FormEvent) {
+  async function handleSupportSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!supportName || !supportEmail || !supportMessage) return;
-    setTicketSubmitted(true);
-    setTimeout(() => {
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      await submitSupportTicketApi({
+        name: supportName,
+        email: supportEmail,
+        topic: supportTopic,
+        message: supportMessage,
+      });
+      setTicketSubmitted(true);
       setSupportName("");
       setSupportEmail("");
       setSupportMessage("");
-    }, 500);
+    } catch (err) {
+      setSubmitError(
+        err instanceof ApiError ? err.message : "Failed to send support ticket email."
+      );
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -423,9 +441,9 @@ export function HelpAboutPage() {
                   <div className="flex size-12 items-center justify-center rounded-full bg-emerald-500/10 text-emerald-500">
                     <CheckCircle2 className="size-7" />
                   </div>
-                  <h3 className="text-lg font-bold text-foreground">Ticket Received!</h3>
+                  <h3 className="text-lg font-bold text-foreground">Ticket Received &amp; Emailed!</h3>
                   <p className="text-sm text-muted-foreground max-w-sm">
-                    Thank you! Your technical support inquiry has been logged. A support representative will reach out to your email shortly.
+                    Thank you! Your technical support ticket has been emailed to our support engineering team (<strong>tejaskumar96300@gmail.com</strong> &amp; <strong>ernest.bonat@gmail.com</strong>).
                   </p>
                   <Button variant="outline" size="sm" onClick={() => setTicketSubmitted(false)}>
                     Submit Another Inquiry
@@ -433,6 +451,12 @@ export function HelpAboutPage() {
                 </div>
               ) : (
                 <form onSubmit={handleSupportSubmit} className="space-y-4">
+                  {submitError && (
+                    <p className="rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                      {submitError}
+                    </p>
+                  )}
+
                   <div className="space-y-1.5">
                     <label className="text-xs font-semibold text-foreground">Your Name *</label>
                     <Input
@@ -461,12 +485,12 @@ export function HelpAboutPage() {
                       onChange={(e) => setSupportTopic(e.target.value)}
                       className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
                     >
-                      <option value="general">General Help & Question</option>
-                      <option value="inspection">Inspection Checklist Issue</option>
-                      <option value="photo">Photo Upload / Cloud Storage</option>
-                      <option value="pdf">PDF Export Problem</option>
-                      <option value="timezone">Timezone or Date Discrepancy</option>
-                      <option value="bug">Report a System Bug</option>
+                      <option value="General Question">General Help &amp; Question</option>
+                      <option value="Inspection Checklist Issue">Inspection Checklist Issue</option>
+                      <option value="Photo Upload / Storage">Photo Upload / Cloud Storage</option>
+                      <option value="PDF Export Problem">PDF Export Problem</option>
+                      <option value="Timezone / Date Issue">Timezone or Date Discrepancy</option>
+                      <option value="System Bug Report">Report a System Bug</option>
                     </select>
                   </div>
 
@@ -481,9 +505,18 @@ export function HelpAboutPage() {
                     />
                   </div>
 
-                  <Button type="submit" className="w-full gap-2">
-                    <Send className="size-4" />
-                    Submit Technical Ticket
+                  <Button type="submit" disabled={submitting} className="w-full gap-2">
+                    {submitting ? (
+                      <>
+                        <Loader2 className="size-4 animate-spin" />
+                        Submitting Ticket...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="size-4" />
+                        Submit Technical Ticket
+                      </>
+                    )}
                   </Button>
                 </form>
               )}

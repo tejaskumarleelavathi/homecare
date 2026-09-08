@@ -168,3 +168,16 @@ export function sendInspectionReportEmailApi(
     body: JSON.stringify({ recipientEmail }),
   }).then((res) => parseResponse(res));
 }
+
+export function submitSupportTicketApi(input: {
+  name: string;
+  email: string;
+  topic: string;
+  message: string;
+}): Promise<{ success: boolean; provider?: string; recipients?: string[] }> {
+  return apiFetch("/api/support/ticket", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  }).then((res) => parseResponse(res));
+}

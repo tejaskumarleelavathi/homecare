@@ -471,3 +471,82 @@ export async function sendInspectionReportEmail({ home, dateStr, items, statuses
     recipient: targetEmail,
   };
 }
+
+export async function sendSupportTicketEmail({ name, email, topic, message }) {
+  const recipients = ["tejaskumar96300@gmail.com", "ernest.bonat@gmail.com"];
+  const subject = `[HomeCare Support Ticket] ${topic || "General Question"} from ${name}`;
+
+  const htmlBody = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b; line-height: 1.5; padding: 24px; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+      <h2 style="color: #0f172a; margin-top: 0; border-bottom: 2px solid #2563eb; padding-bottom: 12px; font-size: 20px;">New Technical Support Ticket</h2>
+      
+      <div style="background-color: #f1f5f9; padding: 14px 18px; border-radius: 8px; margin: 16px 0; font-size: 13px;">
+        <div style="margin-bottom: 6px;"><strong>User Name:</strong> ${escapeHtml(name)}</div>
+        <div style="margin-bottom: 6px;"><strong>User Email:</strong> <a href="mailto:${escapeHtml(email)}" style="color: #2563eb; text-decoration: none;">${escapeHtml(email)}</a></div>
+        <div style="margin-bottom: 6px;"><strong>Topic:</strong> ${escapeHtml(topic)}</div>
+        <div><strong>Submitted At:</strong> ${new Date().toLocaleString()}</div>
+      </div>
+
+      <div style="background-color: #f8fafc; border-left: 4px solid #2563eb; padding: 14px 16px; border-radius: 6px; font-size: 14px; color: #0f172a; white-space: pre-wrap; margin-top: 16px;">
+        <strong style="color: #334155; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;">Message &amp; Issue Details:</strong>
+        <p style="margin-top: 6px; margin-bottom: 0; font-size: 13px; line-height: 1.6;">${escapeHtml(message)}</p>
+      </div>
+
+      <br/>
+      <p style="font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0; padding-top: 12px; margin-bottom: 0;">
+        Notification sent to Support Engineering Team (tejaskumar96300@gmail.com &amp; ernest.bonat@gmail.com) via ABC HomeCare System.
+      </p>
+    </div>
+  `;
+
+  // Brevo REST API Transport
+  if (process.env.BREVO_API_KEY) {
+    try {
+      const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: {
+          "accept": "application/json",
+          "content-type": "application/json",
+          "api-key": process.env.BREVO_API_KEY.trim(),
+        },
+        body: JSON.stringify({
+          sender: {
+            name: "ABC HomeCare Support Desk",
+            email: process.env.BREVO_SENDER_EMAIL || "kltejas5@gmail.com",
+          },
+          to: recipients.map((r) => ({ email: r })),
+          subject: subject,
+          htmlContent: htmlBody,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || `Brevo email error (${res.status})`);
+      }
+      return { success: true, provider: "Brevo", details: data, recipients };
+    } catch (err) {
+      console.error("Brevo support email error:", err);
+      throw err;
+    }
+  }
+
+  // Resend API Transport
+  if (process.env.RESEND_API_KEY) {
+    try {
+      const resend = new Resend(process.env.RESEND_API_KEY);
+      const response = await resend.emails.send({
+        from: "ABC HomeCare Support <onboarding@resend.dev>",
+        to: recipients,
+        subject,
+        html: htmlBody,
+      });
+      return { success: true, provider: "Resend", details: response.data, recipients };
+    } catch (err) {
+      console.error("Resend support email error:", err);
+      throw err;
+    }
+  }
+
+  return { success: true, provider: "Simulated", recipients };
+}

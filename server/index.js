@@ -43,7 +43,7 @@ import {
   scheduleInspection,
   backfillMissingSchedules,
 } from "./db.js";
-import { sendInspectionReportEmail } from "./email.js";
+import { sendInspectionReportEmail, sendSupportTicketEmail } from "./email.js";
 
 const app = express();
 app.use(cors());
@@ -459,6 +459,21 @@ app.post("/api/homes/:homeId/inspections/:date/send-email", async (req, res) => 
     res.json(result);
   } catch (err) {
     res.status(400).json({ errors: [err.message || "Failed to send email."] });
+  }
+});
+
+app.post("/api/support/ticket", async (req, res) => {
+  const { name, email, topic, message } = req.body || {};
+
+  if (!name || !email || !message) {
+    return res.status(400).json({ errors: ["Name, email, and message details are required."] });
+  }
+
+  try {
+    const result = await sendSupportTicketEmail({ name, email, topic, message });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ errors: [err.message || "Failed to submit support ticket."] });
   }
 });
 
