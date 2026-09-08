@@ -19,7 +19,16 @@ function formatDateStr(dateStr) {
   return date.toLocaleDateString("en-US", { dateStyle: "medium" });
 }
 
-export function buildEmailReportHtml({ home, dateStr, items, statusesMap }) {
+function getStatusClass(statusName) {
+  const lower = String(statusName || "").toLowerCase();
+  if (lower.includes("completed")) return "badge-completed";
+  if (lower.includes("progress")) return "badge-in-progress";
+  if (lower.includes("pending")) return "badge-pending";
+  if (lower.includes("incomplete")) return "badge-incomplete";
+  return "badge-default";
+}
+
+export function buildExactInspectionReportHtml({ home, dateStr, items, statusesMap }) {
   const addressStr = home
     ? `${home.street}, ${home.city}, ${home.state} ${home.zip_code}`
     : "Home Inspection Report";
@@ -36,52 +45,53 @@ export function buildEmailReportHtml({ home, dateStr, items, statusesMap }) {
   let tableRowsHtml = "";
   for (const [categoryName, categoryItems] of categoriesMap.entries()) {
     tableRowsHtml += `
-      <tr style="background-color: #f1f5f9;">
-        <td colspan="4" style="padding: 8px 12px; font-weight: 700; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #334155; border-bottom: 1px solid #cbd5e1;">
-          ${escapeHtml(categoryName)}
-        </td>
+      <tr class="category-row">
+        <td colspan="4">${escapeHtml(categoryName)}</td>
       </tr>
     `;
     for (const item of categoryItems) {
       const statusName = item.work_status_id
-        ? statusesMap.get(item.work_status_id) ?? "Unknown"
+        ? statusesMap.get(item.work_status_id) ?? "Pending"
         : "Pending";
 
       const photos = [item.work_photo_pah_1, item.work_photo_pah_2, item.work_photo_pah_3].filter(
         Boolean,
       );
 
-      let photosHtml = '<span style="color: #94a3b8; font-style: italic; font-size: 12px;">No photos</span>';
+      let photosHtml = "";
       if (photos.length > 0) {
-        photosHtml = photos
-          .map(
-            (url, i) =>
-              `<a href="${escapeHtml(url)}" target="_blank" style="margin-right: 6px; text-decoration: none;"><img src="${escapeHtml(url)}" alt="Photo ${i + 1}" style="width: 50px; height: 50px; object-fit: cover; border-radius: 4px; border: 1px solid #cbd5e1; display: inline-block; vertical-align: middle;" /></a>`,
-          )
-          .join("");
+        photosHtml = `<div class="photo-grid">` +
+          photos
+            .map(
+              (url, i) =>
+                `<a href="${escapeHtml(url)}" target="_blank" title="Photo ${i + 1}"><img src="${escapeHtml(url)}" alt="Photo ${i + 1}" /></a>`,
+            )
+            .join("") +
+          `</div>`;
+      } else {
+        photosHtml = `<span class="empty-text">No photos</span>`;
       }
 
+      const statusClass = getStatusClass(statusName);
       const notesContent = item.notes && item.notes.trim() ? escapeHtml(item.notes.trim()) : "";
 
       tableRowsHtml += `
-        <tr>
-          <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; vertical-align: top;">
-            <div style="font-weight: 600; color: #0f172a; font-size: 13px;">${escapeHtml(item.category_item)}</div>
-            ${item.category_description ? `<div style="font-size: 11px; color: #64748b; margin-top: 2px;">${escapeHtml(item.category_description)}</div>` : ""}
+        <tr class="item-row">
+          <td class="item-cell">
+            <div class="item-name">${escapeHtml(item.category_item)}</div>
+            ${item.category_description ? `<div class="item-desc">${escapeHtml(item.category_description)}</div>` : ""}
           </td>
-          <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; vertical-align: top;">
-            <span style="display: inline-block; padding: 2px 8px; font-size: 11px; font-weight: 700; border-radius: 12px; background-color: #f1f5f9; color: #334155; border: 1px solid #cbd5e1;">
-              ${escapeHtml(statusName)}
-            </span>
+          <td class="status-cell">
+            <span class="badge ${statusClass}">${escapeHtml(statusName)}</span>
           </td>
-          <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; vertical-align: top;">
+          <td class="photos-cell">
             ${photosHtml}
           </td>
-          <td style="padding: 10px 12px; border-bottom: 1px solid #e2e8f0; vertical-align: top;">
+          <td class="notes-cell">
             ${
               notesContent
-                ? `<div style="background-color: #f8fafc; border-left: 3px solid #2563eb; padding: 6px 8px; font-size: 12px; color: #0f172a; white-space: pre-wrap; font-weight: 500;">${notesContent}</div>`
-                : '<span style="color: #94a3b8; font-style: italic; font-size: 12px;">—</span>'
+                ? `<div class="notes-box">${notesContent}</div>`
+                : `<span class="empty-text">—</span>`
             }
           </td>
         </tr>
@@ -90,41 +100,226 @@ export function buildEmailReportHtml({ home, dateStr, items, statusesMap }) {
   }
 
   return `<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <title>HomeCare Inspection Report</title>
-</head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b; background-color: #f8fafc; margin: 0; padding: 20px;">
-  <div style="max-width: 700px; margin: 0 auto; background-color: #ffffff; padding: 28px; border-radius: 10px; border: 1px solid #e2e8f0;">
+  <meta charset="UTF-8">
+  <title>Inspection Report - ${escapeHtml(home ? home.street : "Home")} - ${escapeHtml(dateFormatted)}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      color: #1e293b;
+      background: #f8fafc;
+      padding: 24px;
+      line-height: 1.5;
+    }
     
-    <!-- Header -->
-    <div style="border-bottom: 2px solid #0f172a; padding-bottom: 16px; margin-bottom: 20px;">
-      <div style="font-size: 22px; font-weight: 800; color: #0f172a;">HomeCare Inspection Report</div>
-      <div style="font-size: 13px; color: #64748b; margin-top: 2px;">ABC Constructions &amp; Property Quality Assurance</div>
+    .report-container {
+      max-width: 960px;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 36px;
+      border-radius: 12px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+
+    .header {
+      border-bottom: 2px solid #0f172a;
+      padding-bottom: 20px;
+      margin-bottom: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .brand-title {
+      font-size: 24px;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.5px;
+      margin-bottom: 4px;
+    }
+    .brand-subtitle {
+      font-size: 14px;
+      color: #64748b;
+      font-weight: 500;
+    }
+    .property-box {
+      text-align: right;
+    }
+    .property-address {
+      font-size: 16px;
+      font-weight: 700;
+      color: #1e293b;
+    }
+    .property-sub {
+      font-size: 13px;
+      color: #64748b;
+      margin-top: 2px;
+    }
+    .report-meta {
+      display: flex;
+      gap: 20px;
+      background: #f1f5f9;
+      padding: 12px 16px;
+      border-radius: 8px;
+      margin-bottom: 24px;
+      font-size: 13px;
+    }
+    .meta-item {
+      display: flex;
+      flex-direction: column;
+    }
+    .meta-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #64748b;
+      font-weight: 600;
+    }
+    .meta-value {
+      font-weight: 600;
+      color: #0f172a;
+      margin-top: 2px;
+    }
+
+    ${
+      home?.notes
+        ? `.home-notes { background: #fffbeb; border: 1px solid #fef3c7; padding: 10px 14px; border-radius: 6px; margin-bottom: 20px; font-size: 13px; color: #92400e; }`
+        : ""
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 8px;
+    }
+    th {
+      background: #0f172a;
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      text-align: left;
+      padding: 10px 12px;
+    }
+    th:first-child { border-top-left-radius: 6px; }
+    th:last-child { border-top-right-radius: 6px; }
+    
+    td {
+      padding: 12px;
+      border-bottom: 1px solid #e2e8f0;
+      vertical-align: top;
+      font-size: 13px;
+    }
+
+    .category-row td {
+      background: #f1f5f9;
+      font-weight: 700;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #334155;
+      padding: 8px 12px;
+      border-bottom: 1px solid #cbd5e1;
+    }
+
+    .item-cell { width: 30%; }
+    .item-name { font-weight: 600; color: #0f172a; }
+    .item-desc { font-size: 12px; color: #64748b; margin-top: 2px; }
+
+    .status-cell { width: 15%; }
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      font-size: 11px;
+      font-weight: 700;
+      border-radius: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .badge-completed { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+    .badge-in-progress { background: #dbeafe; color: #1d4ed8; border: 1px solid #bfdbfe; }
+    .badge-pending { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+    .badge-incomplete { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
+    .badge-default { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
+
+    .photos-cell { width: 25%; }
+    .photo-grid { display: flex; gap: 8px; flex-wrap: wrap; }
+    .photo-grid img {
+      width: 64px;
+      height: 64px;
+      object-fit: cover;
+      border-radius: 6px;
+      border: 1px solid #cbd5e1;
+    }
+
+    .notes-cell { width: 30%; }
+    .notes-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-left: 3px solid #2563eb;
+      padding: 8px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #0f172a;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.4;
+      font-weight: 500;
+    }
+    .empty-text { color: #94a3b8; font-style: italic; font-size: 12px; }
+
+    .footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="report-container">
+    <div class="header">
+      <div>
+        <div class="brand-title">HomeCare Inspection</div>
+        <div class="brand-subtitle">Property Quality &amp; Maintenance Record</div>
+      </div>
+      <div class="property-box">
+        <div class="property-address">${escapeHtml(addressStr)}</div>
+        ${home?.emails ? `<div class="property-sub">Contact: ${escapeHtml(home.emails)}</div>` : ""}
+      </div>
     </div>
 
-    <!-- Property Details -->
-    <div style="background-color: #f1f5f9; padding: 14px 16px; border-radius: 8px; margin-bottom: 20px; font-size: 13px;">
-      <div style="font-weight: 700; font-size: 15px; color: #0f172a; margin-bottom: 4px;">${escapeHtml(addressStr)}</div>
-      <div style="color: #475569;"><strong>Inspection Date:</strong> ${escapeHtml(dateFormatted)}</div>
-      ${home?.emails ? `<div style="color: #475569; margin-top: 2px;"><strong>Contact Email:</strong> ${escapeHtml(home.emails)}</div>` : ""}
+    <div class="report-meta">
+      <div class="meta-item">
+        <span class="meta-label">Inspection Date</span>
+        <span class="meta-value">${escapeHtml(dateFormatted)}</span>
+      </div>
+      <div class="meta-item">
+        <span class="meta-label">Total Checklist Items</span>
+        <span class="meta-value">${items.length}</span>
+      </div>
     </div>
 
     ${
       home?.notes
-        ? `<div style="background-color: #fffbeb; border: 1px solid #fef3c7; padding: 10px 14px; border-radius: 6px; margin-bottom: 20px; font-size: 12px; color: #92400e;"><strong>Property Notes:</strong> ${escapeHtml(home.notes)}</div>`
+        ? `<div class="home-notes"><strong>Property Notes:</strong> ${escapeHtml(home.notes)}</div>`
         : ""
     }
 
-    <!-- Table -->
-    <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+    <table>
       <thead>
-        <tr style="background-color: #0f172a; color: #ffffff; text-align: left; font-size: 11px; text-transform: uppercase;">
-          <th style="padding: 8px 12px;">Checklist Item</th>
-          <th style="padding: 8px 12px;">Status</th>
-          <th style="padding: 8px 12px;">Photos</th>
-          <th style="padding: 8px 12px;">Notes</th>
+        <tr>
+          <th>Checklist Item</th>
+          <th>Status</th>
+          <th>Photos</th>
+          <th>Notes</th>
         </tr>
       </thead>
       <tbody>
@@ -132,27 +327,51 @@ export function buildEmailReportHtml({ home, dateStr, items, statusesMap }) {
       </tbody>
     </table>
 
-    <div style="margin-top: 24px; padding-top: 14px; border-top: 1px solid #e2e8f0; font-size: 11px; color: #94a3b8; display: flex; justify-content: space-between;">
-      <span>Sent by ABC Constructions Home Care System</span>
+    <div class="footer">
+      <span>Generated by HomeCare App</span>
       <span>${new Date().toLocaleString()}</span>
     </div>
   </div>
+
 </body>
 </html>`;
 }
 
 export async function sendInspectionReportEmail({ home, dateStr, items, statusesMap, recipientEmail }) {
+  // Use recipient specified, or target home's listed emails
   const targetEmail = (recipientEmail || home?.emails || "").trim();
   if (!targetEmail) {
     throw new Error("No recipient email address available for this home.");
   }
 
   const dateFormatted = formatDateStr(dateStr);
-  const addressStr = home ? `${home.street}, ${home.city}` : "Property";
-  const subject = `HomeCare Inspection Report - ${addressStr} (${dateFormatted})`;
-  const htmlBody = buildEmailReportHtml({ home, dateStr, items, statusesMap });
+  const addressStr = home ? `${home.street}, ${home.city}, ${home.state} ${home.zip_code}` : "Property";
+  const subject = `HomeCare Inspection Report - ${home ? home.street : "Property"} (${dateFormatted})`;
 
-  // 1. If BREVO_API_KEY is configured (Sends to ANY email address immediately!)
+  // Generate exact HTML document matching export view 100%
+  const exactReportHtml = buildExactInspectionReportHtml({ home, dateStr, items, statusesMap });
+
+  const emailCoverHtml = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b; line-height: 1.5; padding: 24px; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
+      <h2 style="color: #0f172a; margin-top: 0; border-bottom: 2px solid #0f172a; padding-bottom: 12px; font-size: 20px;">HomeCare Inspection Report</h2>
+      <p style="font-size: 14px; color: #334155;">Hello,</p>
+      <p style="font-size: 14px; color: #334155;">Please find attached the official HomeCare Inspection Report for your property:</p>
+      <div style="background-color: #f1f5f9; padding: 14px 18px; border-radius: 8px; margin: 16px 0; font-size: 13px;">
+        <div style="font-weight: 700; color: #0f172a; font-size: 15px; margin-bottom: 4px;">${escapeHtml(addressStr)}</div>
+        <div style="color: #475569;"><strong>Inspection Date:</strong> ${escapeHtml(dateFormatted)}</div>
+        <div style="color: #475569; margin-top: 2px;"><strong>Total Checklist Items:</strong> ${items.length}</div>
+      </div>
+      <p style="font-size: 13px; color: #475569;">The attached report contains full property details, category items, status badges, photo evidence, and complete item notes.</p>
+      <br/>
+      <p style="font-size: 13px; color: #475569; border-top: 1px solid #e2e8f0; padding-top: 14px; margin-bottom: 0;">
+        Best regards,<br/>
+        <strong style="color: #0f172a;">ABC Constructions Home Care Team</strong><br/>
+        <span style="font-size: 12px; color: #64748b;">info@abcconstructions.com</span>
+      </p>
+    </div>
+  `;
+
+  // 1. Brevo REST API Transport
   if (process.env.BREVO_API_KEY) {
     try {
       const res = await fetch("https://api.brevo.com/v3/smtp/email", {
@@ -169,11 +388,11 @@ export async function sendInspectionReportEmail({ home, dateStr, items, statuses
           },
           to: [{ email: targetEmail }],
           subject: subject,
-          htmlContent: htmlBody,
+          htmlContent: emailCoverHtml,
           attachment: [
             {
               name: `HomeCare_Inspection_${dateStr}.html`,
-              content: Buffer.from(htmlBody).toString("base64"),
+              content: Buffer.from(exactReportHtml).toString("base64"),
             },
           ],
         }),
@@ -190,7 +409,7 @@ export async function sendInspectionReportEmail({ home, dateStr, items, statuses
     }
   }
 
-  // 2. If RESEND_API_KEY is configured
+  // 2. Resend API Transport
   if (process.env.RESEND_API_KEY) {
     try {
       const resend = new Resend(process.env.RESEND_API_KEY);
@@ -199,11 +418,11 @@ export async function sendInspectionReportEmail({ home, dateStr, items, statuses
         from: fromEmail,
         to: targetEmail,
         subject,
-        html: htmlBody,
+        html: emailCoverHtml,
         attachments: [
           {
             filename: `HomeCare_Inspection_${dateStr}.html`,
-            content: Buffer.from(htmlBody).toString("base64"),
+            content: Buffer.from(exactReportHtml).toString("base64"),
           },
         ],
       });
@@ -218,7 +437,7 @@ export async function sendInspectionReportEmail({ home, dateStr, items, statuses
     }
   }
 
-  // 2. SMTP Transport fallback (Nodemailer / Ethereal / Custom SMTP)
+  // 3. SMTP Transport fallback
   const smtpHost = process.env.SMTP_HOST;
   if (smtpHost) {
     const transporter = nodemailer.createTransport({
@@ -235,51 +454,15 @@ export async function sendInspectionReportEmail({ home, dateStr, items, statuses
       from: `"ABC Constructions" <${process.env.SMTP_FROM || "info@abcconstructions.com"}>`,
       to: targetEmail,
       subject,
-      html: htmlBody,
+      html: emailCoverHtml,
       attachments: [
         {
           filename: `HomeCare_Inspection_${dateStr}.html`,
-          content: htmlBody,
+          content: exactReportHtml,
         },
       ],
     });
     return { success: true, provider: "SMTP", details: info, recipient: targetEmail };
-  }
-
-  // 3. Fallback test transport (Ethereal test account for dev/demo)
-  const testAccount = await nodemailer.createTestAccount().catch(() => null);
-  if (testAccount) {
-    const transporter = nodemailer.createTransport({
-      host: testAccount.smtp.host,
-      port: testAccount.smtp.port,
-      secure: testAccount.smtp.secure,
-      auth: {
-        user: testAccount.user,
-        pass: testAccount.pass,
-      },
-    });
-
-    const info = await transporter.sendMail({
-      from: `"ABC Constructions" <info@abcconstructions.com>`,
-      to: targetEmail,
-      subject,
-      html: htmlBody,
-      attachments: [
-        {
-          filename: `HomeCare_Inspection_${dateStr}.html`,
-          content: htmlBody,
-        },
-      ],
-    });
-
-    const previewUrl = nodemailer.getTestMessageUrl(info);
-    console.log(`[Ethereal Mock Email Sent] Preview URL: ${previewUrl}`);
-    return {
-      success: true,
-      provider: "Mock/Test Service",
-      recipient: targetEmail,
-      previewUrl,
-    };
   }
 
   return {
