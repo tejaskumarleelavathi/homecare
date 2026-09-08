@@ -165,7 +165,7 @@ export async function sendInspectionReportEmail({ home, dateStr, items, statuses
         body: JSON.stringify({
           sender: {
             name: "ABC HomeCare",
-            email: process.env.BREVO_SENDER_EMAIL || "info@abcconstructions.com",
+            email: process.env.BREVO_SENDER_EMAIL || "kltejas5@gmail.com",
           },
           to: [{ email: targetEmail }],
           subject: subject,
