@@ -6,6 +6,7 @@ import { LoginPage } from "@/pages/LoginPage";
 import { HomesPage } from "@/pages/HomesPage";
 import { WorkStatusPage } from "@/pages/WorkStatusPage";
 import { InspectionsPage } from "@/pages/InspectionsPage";
+import { HelpAboutPage } from "@/pages/HelpAboutPage";
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -26,6 +27,7 @@ function App() {
         {activeTab === "home" && <HomesPage />}
         {activeTab === "work-status" && <WorkStatusPage />}
         {activeTab === "inspections" && <InspectionsPage />}
+        {activeTab === "help" && <HelpAboutPage />}
       </main>
       <Footer />
     </div>

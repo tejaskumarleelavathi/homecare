@@ -8,7 +8,7 @@ export function Footer() {
 
         <div className="space-y-0.5">
           <p className="text-sm font-medium text-foreground">
-            © 2025 ABC Constructions. All rights reserved.
+            © 2026 ABC Constructions. All rights reserved.
           </p>
           <p className="text-sm text-muted-foreground italic">
             Building excellence, one project at a time

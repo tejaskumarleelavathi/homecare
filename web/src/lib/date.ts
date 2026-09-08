@@ -6,7 +6,9 @@ export function toDateStr(date: Date): string {
 }
 
 export function fromDateStr(dateStr: string): Date {
+  if (!dateStr || typeof dateStr !== "string") return new Date();
   const [y, m, d] = dateStr.split("-").map(Number);
+  if (!y || !m || !d) return new Date();
   return new Date(y, m - 1, d);
 }
 
@@ -21,5 +23,10 @@ export function addDaysStr(dateStr: string, days: number): string {
 }
 
 export function formatDateStr(dateStr: string): string {
-  return fromDateStr(dateStr).toLocaleDateString(undefined, { dateStyle: "medium" });
+  if (!dateStr || typeof dateStr !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return dateStr || "";
+  }
+  const date = fromDateStr(dateStr);
+  if (Number.isNaN(date.getTime())) return dateStr;
+  return date.toLocaleDateString(undefined, { dateStyle: "medium" });
 }

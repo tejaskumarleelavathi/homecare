@@ -1,4 +1,4 @@
-import { CalendarCheck, ClipboardList, Home as HomeIcon, HousePlus, LogOut, User } from "lucide-react";
+import { CalendarCheck, ClipboardList, HelpCircle, Home as HomeIcon, HousePlus, LogOut, User } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/Logo";
@@ -12,7 +12,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-export type NavKey = "home" | "work-status" | "inspections";
+export type NavKey = "home" | "work-status" | "inspections" | "help";
 
 interface NavItem {
   key: NavKey;
@@ -25,6 +25,7 @@ const NAV_ITEMS: NavItem[] = [
   { key: "home", label: "Home", icon: HomeIcon, enabled: true },
   { key: "work-status", label: "Work Status", icon: ClipboardList, enabled: true },
   { key: "inspections", label: "Inspections", icon: CalendarCheck, enabled: true },
+  { key: "help", label: "Help & About", icon: HelpCircle, enabled: true },
 ];
 
 interface TopNavProps {
@@ -37,14 +38,26 @@ export function TopNav({ activeTab, onTabChange, onLogout }: TopNavProps) {
   return (
     <header className="sticky top-0 z-20 print:hidden">
       <div className="mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center gap-4 px-4 pt-3 sm:px-6">
-        <Logo showTagline={false} className="justify-self-start" />
+        <button
+          type="button"
+          onClick={() => onTabChange("home")}
+          className="justify-self-start cursor-pointer text-left transition-opacity hover:opacity-80 focus:outline-none"
+          title="Go to Home"
+        >
+          <Logo showTagline={false} />
+        </button>
 
-        <div className="flex items-center justify-center gap-2">
+        <button
+          type="button"
+          onClick={() => onTabChange("home")}
+          className="flex items-center justify-center gap-2 cursor-pointer transition-opacity hover:opacity-80 focus:outline-none"
+          title="Go to Home"
+        >
           <HousePlus className="size-5 text-primary" strokeWidth={2.25} />
           <span className="font-heading text-lg font-semibold tracking-tight whitespace-nowrap">
             Home Care
           </span>
-        </div>
+        </button>
 
         <div className="justify-self-end">
           <DropdownMenu>

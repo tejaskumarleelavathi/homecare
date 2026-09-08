@@ -37,11 +37,13 @@ import {
   HOME_COLUMNS,
   WORK_STATUS_COLUMNS,
   WORK_CATEGORY_COLUMNS,
+  getTodayStr,
   todayStr,
   addDaysStr,
   scheduleInspection,
   backfillMissingSchedules,
 } from "./db.js";
+import { sendInspectionReportEmail } from "./email.js";
 
 const app = express();
 app.use(cors());
@@ -123,8 +125,8 @@ app.post("/api/homes", async (req, res) => {
     );
     const newHomeId = insertResult.rows[0].home_id;
 
-    // Every home gets its first inspection auto-scheduled for the next day.
-    await scheduleInspection(newHomeId, addDaysStr(todayStr(), 1), {
+    // Every home gets its first inspection auto-scheduled for the next day (in requestor's timezone).
+    await scheduleInspection(newHomeId, addDaysStr(todayStr(req), 1), {
       isOriginal: true,
       client,
     });
@@ -294,8 +296,8 @@ async function getInspectionRows(homeId, dateStr) {
   return res.rows.map(formatCategoryRow);
 }
 
-function buildInspectionView(dateStr, items) {
-  const today = todayStr();
+function buildInspectionView(dateStr, items, req) {
+  const today = todayStr(req);
   const isFuture = dateStr > today;
   const isPast = dateStr < today;
   const hasItems = items.length > 0;
@@ -325,10 +327,10 @@ app.get("/api/homes/:homeId/inspections", async (req, res) => {
 
   const dateStr = typeof req.query.date === "string" && DATE_RE.test(req.query.date)
     ? req.query.date
-    : todayStr();
+    : todayStr(req);
 
   const items = await getInspectionRows(homeId, dateStr);
-  res.json(buildInspectionView(dateStr, items));
+  res.json(buildInspectionView(dateStr, items, req));
 });
 
 app.post("/api/homes/:homeId/inspections", async (req, res) => {
@@ -342,7 +344,7 @@ app.post("/api/homes/:homeId/inspections", async (req, res) => {
   if (typeof dateStr !== "string" || !DATE_RE.test(dateStr)) {
     return res.status(400).json({ errors: ["A valid date is required."] });
   }
-  if (dateStr < todayStr()) {
+  if (dateStr < todayStr(req)) {
     return res.status(400).json({ errors: ["You cannot schedule an inspection for a past date."] });
   }
   const existingRows = await getInspectionRows(homeId, dateStr);
@@ -351,7 +353,7 @@ app.post("/api/homes/:homeId/inspections", async (req, res) => {
   }
 
   const items = await scheduleInspection(homeId, dateStr, { isOriginal: false });
-  res.status(201).json(buildInspectionView(dateStr, items));
+  res.status(201).json(buildInspectionView(dateStr, items, req));
 });
 
 app.put("/api/homes/:homeId/inspections/:date/reschedule", async (req, res) => {
@@ -366,7 +368,7 @@ app.put("/api/homes/:homeId/inspections/:date/reschedule", async (req, res) => {
   if (existingItems.length === 0) {
     return res.status(404).json({ errors: ["No inspection scheduled for that date."] });
   }
-  if (dateStr < todayStr()) {
+  if (dateStr < todayStr(req)) {
     return res.status(400).json({ errors: ["Only current or future inspections can be rescheduled."] });
   }
 
@@ -374,7 +376,7 @@ app.put("/api/homes/:homeId/inspections/:date/reschedule", async (req, res) => {
   if (typeof newDateStr !== "string" || !DATE_RE.test(newDateStr)) {
     return res.status(400).json({ errors: ["A valid new date is required."] });
   }
-  if (newDateStr < todayStr()) {
+  if (newDateStr < todayStr(req)) {
     return res.status(400).json({ errors: ["The new date cannot be in the past."] });
   }
   const newDateExistingRows = await getInspectionRows(homeId, newDateStr);
@@ -389,7 +391,7 @@ app.put("/api/homes/:homeId/inspections/:date/reschedule", async (req, res) => {
   );
 
   const items = await getInspectionRows(homeId, newDateStr);
-  res.json(buildInspectionView(newDateStr, items));
+  res.json(buildInspectionView(newDateStr, items, req));
 });
 
 app.delete("/api/homes/:homeId/inspections/:date", async (req, res) => {
@@ -405,7 +407,7 @@ app.delete("/api/homes/:homeId/inspections/:date", async (req, res) => {
     return res.status(404).json({ errors: ["No inspection scheduled for that date."] });
   }
 
-  const view = buildInspectionView(dateStr, items);
+  const view = buildInspectionView(dateStr, items, req);
   if (!view.canDeleteDay) {
     return res.status(403).json({
       errors: [
@@ -416,6 +418,48 @@ app.delete("/api/homes/:homeId/inspections/:date", async (req, res) => {
 
   await pool.query("DELETE FROM work_category WHERE home_id = $1 AND date = $2", [homeId, dateStr]);
   res.status(204).end();
+});
+
+app.post("/api/homes/:homeId/inspections/:date/send-email", async (req, res) => {
+  const homeId = Number(req.params.homeId);
+  const dateStr = req.params.date;
+
+  const homeResult = await pool.query(
+    `SELECT ${HOME_COLUMNS.join(", ")} FROM home WHERE home_id = $1`,
+    [homeId]
+  );
+  if (homeResult.rows.length === 0) {
+    return res.status(404).json({ errors: ["Home not found."] });
+  }
+  const home = homeResult.rows[0];
+
+  const items = await getInspectionRows(homeId, dateStr);
+  if (items.length === 0) {
+    return res.status(404).json({ errors: ["No inspection found for this date."] });
+  }
+
+  const statusesResult = await pool.query(
+    `SELECT ${WORK_STATUS_COLUMNS.join(", ")} FROM work_status`
+  );
+  const statusesMap = new Map();
+  for (const s of statusesResult.rows) {
+    statusesMap.set(s.work_status_id, s.status_name);
+  }
+
+  const recipientEmail = req.body?.recipientEmail;
+
+  try {
+    const result = await sendInspectionReportEmail({
+      home,
+      dateStr,
+      items,
+      statusesMap,
+      recipientEmail,
+    });
+    res.json(result);
+  } catch (err) {
+    res.status(400).json({ errors: [err.message || "Failed to send email."] });
+  }
 });
 
 app.put("/api/homes/:homeId/inspections/:date/items/:workCategoryId", async (req, res) => {
@@ -433,7 +477,7 @@ app.put("/api/homes/:homeId/inspections/:date/items/:workCategoryId", async (req
   }
   const item = formatCategoryRow(itemResult.rows[0]);
 
-  if (dateStr > todayStr()) {
+  if (dateStr > todayStr(req)) {
     return res.status(403).json({ errors: ["Future inspections can't be edited yet."] });
   }
 
@@ -518,7 +562,7 @@ app.post(
     }
     const item = formatCategoryRow(itemResult.rows[0]);
 
-    if (dateStr > todayStr()) {
+    if (dateStr > todayStr(req)) {
       fs.unlink(req.file.path, () => {});
       return res.status(403).json({ errors: ["Future inspections can't be edited yet."] });
     }

@@ -47,8 +47,38 @@ export const WORK_CATEGORY_COLUMNS = [
   "updated_at",
 ];
 
-export function todayStr() {
+// Ensure PostgreSQL DATE type (OID 1082) is returned as raw 'YYYY-MM-DD' string without timezone conversion
+pg.types.setTypeParser(1082, (val) => val);
+
+export function getTodayStr(req) {
+  const clientToday = req?.headers?.["x-client-today"];
+  if (typeof clientToday === "string" && /^\d{4}-\d{2}-\d{2}$/.test(clientToday)) {
+    return clientToday;
+  }
+
+  const clientTz = req?.headers?.["x-client-timezone"];
+  if (typeof clientTz === "string" && clientTz.trim()) {
+    try {
+      const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: clientTz.trim(),
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).formatToParts(new Date());
+      const y = parts.find((p) => p.type === "year")?.value;
+      const m = parts.find((p) => p.type === "month")?.value;
+      const d = parts.find((p) => p.type === "day")?.value;
+      if (y && m && d) return `${y}-${m}-${d}`;
+    } catch {
+      // Ignore invalid timezone string
+    }
+  }
+
   return new Date().toISOString().slice(0, 10);
+}
+
+export function todayStr(req) {
+  return getTodayStr(req);
 }
 
 export function addDaysStr(dateStr, days) {
@@ -74,9 +104,22 @@ export async function getPendingStatusId() {
 
 export function formatCategoryRow(row) {
   if (!row) return row;
+  let dateStr = null;
+  if (row.date) {
+    if (typeof row.date === "string") {
+      dateStr = row.date.slice(0, 10);
+    } else if (row.date instanceof Date) {
+      const y = row.date.getUTCFullYear();
+      const m = String(row.date.getUTCMonth() + 1).padStart(2, "0");
+      const d = String(row.date.getUTCDate()).padStart(2, "0");
+      dateStr = `${y}-${m}-${d}`;
+    } else {
+      dateStr = String(row.date).slice(0, 10);
+    }
+  }
   return {
     ...row,
-    date: row.date ? (row.date instanceof Date ? row.date.toISOString().slice(0, 10) : String(row.date).slice(0, 10)) : null
+    date: dateStr,
   };
 }
 

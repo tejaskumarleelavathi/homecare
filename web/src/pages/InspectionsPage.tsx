@@ -5,6 +5,7 @@ import {
   CalendarOff,
   Info,
   Loader2,
+  Mail,
   Printer,
   RefreshCw,
   ShieldCheck,
@@ -22,10 +23,12 @@ import {
   fetchWorkStatuses,
   rescheduleInspection,
   scheduleInspection,
+  sendInspectionReportEmailApi,
   updateInspectionItem,
   uploadInspectionPhoto,
 } from "@/lib/api";
 import { fromDateStr, formatDateStr, toDateStr, todayStr } from "@/lib/date";
+import { exportInspectionPdf } from "@/lib/pdf-export";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -66,6 +69,8 @@ export function InspectionsPage() {
   const [dayLoading, setDayLoading] = useState(false);
   const [dayError, setDayError] = useState("");
   const [actionError, setActionError] = useState("");
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailSuccessMsg, setEmailSuccessMsg] = useState("");
 
   useEffect(() => {
     fetchHomes()
@@ -149,6 +154,26 @@ export function InspectionsPage() {
     }
   }
 
+  async function handleSendEmail() {
+    if (selectedHomeId === null || !dayView) return;
+    setEmailSending(true);
+    setActionError("");
+    setEmailSuccessMsg("");
+    try {
+      const res = await sendInspectionReportEmailApi(selectedHomeId, dayView.date);
+      setEmailSuccessMsg(
+        `Inspection report email dispatched successfully to ${res.recipient}!`
+      );
+      exportInspectionPdf(selectedHome, dayView, statuses);
+    } catch (err) {
+      setActionError(
+        err instanceof ApiError ? err.message : "Couldn't send inspection email."
+      );
+    } finally {
+      setEmailSending(false);
+    }
+  }
+
   async function handleDeleteDay() {
     if (selectedHomeId === null || !dayView) return;
     if (!window.confirm(`Delete the entire inspection scheduled for ${formatDateStr(dayView.date)}? This can't be undone.`)) {
@@ -223,10 +248,30 @@ export function InspectionsPage() {
       <div className="flex flex-wrap items-center justify-between gap-4 print:hidden">
         <h1 className="text-2xl font-semibold tracking-tight">Inspections</h1>
         {dayView && dayView.items.length > 0 && (
-          <Button type="button" variant="outline" onClick={() => window.print()}>
-            <Printer className="size-4" />
-            Export PDF
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button type="button" variant="outline" onClick={() => exportInspectionPdf(selectedHome, dayView, statuses)}>
+              <Printer className="size-4" />
+              Export PDF
+            </Button>
+            <Button
+              type="button"
+              variant="default"
+              disabled={emailSending}
+              onClick={handleSendEmail}
+            >
+              {emailSending ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Mail className="size-4" />
+                  Send Email
+                </>
+              )}
+            </Button>
+          </div>
         )}
       </div>
 
@@ -349,6 +394,15 @@ export function InspectionsPage() {
             </p>
           )}
 
+          {emailSuccessMsg && (
+            <div className="mx-4 mt-3 flex items-center justify-between rounded-md bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-sm text-emerald-600 dark:text-emerald-400 print:hidden">
+              <span>{emailSuccessMsg}</span>
+              <button type="button" onClick={() => setEmailSuccessMsg("")} className="text-xs font-semibold hover:underline">
+                Dismiss
+              </button>
+            </div>
+          )}
+
           {dayView.items.length === 0 ? (
             <div className="flex flex-col items-center gap-3 px-6 py-16 text-center">
               <div className="flex size-12 items-center justify-center rounded-full border border-border text-muted-foreground">
@@ -469,14 +523,14 @@ export function InspectionsPage() {
                                       className="w-full text-xs min-h-[38px] h-[38px] resize-none"
                                     />
                                   </div>
-                                  <span className="hidden print:inline text-xs whitespace-pre-wrap">
-                                    {item.notes || "—"}
-                                  </span>
+                                  <div className="hidden print:block text-xs whitespace-pre-wrap text-foreground font-medium">
+                                    {item.notes && item.notes.trim() ? item.notes : "—"}
+                                  </div>
                                 </>
                               ) : (
-                                <span className="text-xs text-muted-foreground whitespace-pre-wrap">
-                                  {item.notes || "—"}
-                                </span>
+                                <div className="text-xs text-muted-foreground print:text-foreground print:font-medium whitespace-pre-wrap">
+                                  {item.notes && item.notes.trim() ? item.notes : "—"}
+                                </div>
                               )}
                             </TableCell>
                           </TableRow>

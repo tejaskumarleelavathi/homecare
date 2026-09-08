@@ -17,7 +17,12 @@ import {
 import { WorkStatusFormDialog } from "@/components/work-status/WorkStatusFormDialog";
 
 function formatTimestamp(value: string) {
-  const isoLike = value.includes("T") ? value : `${value.replace(" ", "T")}Z`;
+  if (!value) return "";
+  const isoLike = value.includes("T")
+    ? value
+    : value.includes(" ")
+    ? value.replace(" ", "T")
+    : value;
   const date = new Date(isoLike);
   if (Number.isNaN(date.getTime())) return value;
   return date.toLocaleDateString(undefined, { dateStyle: "medium" });
