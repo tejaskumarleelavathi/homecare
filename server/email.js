@@ -156,8 +156,8 @@ export async function sendInspectionReportEmail({ home, dateStr, items, statuses
   if (process.env.RESEND_API_KEY) {
     try {
       const resend = new Resend(process.env.RESEND_API_KEY);
-      const fromEmail = process.env.RESEND_FROM_EMAIL || "info@abcconstructions.com <onboarding@resend.dev>";
-      const data = await resend.emails.send({
+      const fromEmail = process.env.RESEND_FROM_EMAIL || "ABC HomeCare <onboarding@resend.dev>";
+      const response = await resend.emails.send({
         from: fromEmail,
         to: targetEmail,
         subject,
@@ -169,9 +169,14 @@ export async function sendInspectionReportEmail({ home, dateStr, items, statuses
           },
         ],
       });
-      return { success: true, provider: "Resend", details: data, recipient: targetEmail };
+      if (response.error) {
+        console.error("Resend API returned error:", response.error);
+        throw new Error(response.error.message || "Resend email delivery failed.");
+      }
+      return { success: true, provider: "Resend", details: response.data, recipient: targetEmail };
     } catch (resendErr) {
-      console.error("Resend error, falling back to SMTP transport:", resendErr);
+      console.error("Resend delivery exception:", resendErr);
+      throw resendErr;
     }
   }
 
