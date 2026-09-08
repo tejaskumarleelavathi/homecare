@@ -152,7 +152,45 @@ export async function sendInspectionReportEmail({ home, dateStr, items, statuses
   const subject = `HomeCare Inspection Report - ${addressStr} (${dateFormatted})`;
   const htmlBody = buildEmailReportHtml({ home, dateStr, items, statusesMap });
 
-  // 1. If RESEND_API_KEY is configured
+  // 1. If BREVO_API_KEY is configured (Sends to ANY email address immediately!)
+  if (process.env.BREVO_API_KEY) {
+    try {
+      const res = await fetch("https://api.brevo.com/v3/smtp/email", {
+        method: "POST",
+        headers: {
+          "accept": "application/json",
+          "content-type": "application/json",
+          "api-key": process.env.BREVO_API_KEY.trim(),
+        },
+        body: JSON.stringify({
+          sender: {
+            name: "ABC HomeCare",
+            email: process.env.BREVO_SENDER_EMAIL || "info@abcconstructions.com",
+          },
+          to: [{ email: targetEmail }],
+          subject: subject,
+          htmlContent: htmlBody,
+          attachment: [
+            {
+              name: `HomeCare_Inspection_${dateStr}.html`,
+              content: Buffer.from(htmlBody).toString("base64"),
+            },
+          ],
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || `Brevo email delivery error (${res.status})`);
+      }
+      return { success: true, provider: "Brevo", details: data, recipient: targetEmail };
+    } catch (brevoErr) {
+      console.error("Brevo delivery exception:", brevoErr);
+      throw brevoErr;
+    }
+  }
+
+  // 2. If RESEND_API_KEY is configured
   if (process.env.RESEND_API_KEY) {
     try {
       const resend = new Resend(process.env.RESEND_API_KEY);
