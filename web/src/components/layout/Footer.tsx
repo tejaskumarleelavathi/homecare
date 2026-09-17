@@ -14,7 +14,7 @@ export function Footer() {
             Building excellence, one project at a time
           </p>
           <p className="text-xs text-muted-foreground">
-            Developed by BioGenAI Solutions LLC
+            Developed by BioGenAI Solutions LLC — Agentic AI Automation &amp; Web Applications Development.
           </p>
         </div>
       </div>

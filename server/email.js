@@ -473,14 +473,24 @@ export async function sendInspectionReportEmail({ home, dateStr, items, statuses
 }
 
 export async function sendSupportTicketEmail({ name, email, topic, message }) {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  const hh = String(now.getHours()).padStart(2, "0");
+  const min = String(now.getMinutes()).padStart(2, "0");
+  const ss = String(now.getSeconds()).padStart(2, "0");
+  const ticketNumber = `T-${yyyy}-${mm}-${dd}-${hh}-${min}-${ss}`;
+
   const recipients = ["tejaskumar96300@gmail.com", "ernest.bonat@gmail.com"];
-  const subject = `[HomeCare Support Ticket] ${topic || "General Question"} from ${name}`;
+  const subject = `[Support Ticket ${ticketNumber}] ${topic || "General Question"} from ${name}`;
 
   const htmlBody = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b; line-height: 1.5; padding: 24px; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
       <h2 style="color: #0f172a; margin-top: 0; border-bottom: 2px solid #2563eb; padding-bottom: 12px; font-size: 20px;">New Technical Support Ticket</h2>
       
       <div style="background-color: #f1f5f9; padding: 14px 18px; border-radius: 8px; margin: 16px 0; font-size: 13px;">
+        <div style="margin-bottom: 8px; font-size: 14px; color: #2563eb;"><strong>Ticket Number:</strong> <code style="background: #e2e8f0; padding: 3px 8px; border-radius: 4px; font-family: monospace; font-weight: bold; color: #1e40af;">${ticketNumber}</code></div>
         <div style="margin-bottom: 6px;"><strong>User Name:</strong> ${escapeHtml(name)}</div>
         <div style="margin-bottom: 6px;"><strong>User Email:</strong> <a href="mailto:${escapeHtml(email)}" style="color: #2563eb; text-decoration: none;">${escapeHtml(email)}</a></div>
         <div style="margin-bottom: 6px;"><strong>Topic:</strong> ${escapeHtml(topic)}</div>
@@ -524,7 +534,7 @@ export async function sendSupportTicketEmail({ name, email, topic, message }) {
       if (!res.ok) {
         throw new Error(data.message || `Brevo email error (${res.status})`);
       }
-      return { success: true, provider: "Brevo", details: data, recipients };
+      return { success: true, provider: "Brevo", details: data, recipients, ticketNumber };
     } catch (err) {
       console.error("Brevo support email error:", err);
       throw err;
@@ -541,12 +551,12 @@ export async function sendSupportTicketEmail({ name, email, topic, message }) {
         subject,
         html: htmlBody,
       });
-      return { success: true, provider: "Resend", details: response.data, recipients };
+      return { success: true, provider: "Resend", details: response.data, recipients, ticketNumber };
     } catch (err) {
       console.error("Resend support email error:", err);
       throw err;
     }
   }
 
-  return { success: true, provider: "Simulated", recipients };
+  return { success: true, provider: "Simulated", recipients, ticketNumber };
 }

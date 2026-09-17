@@ -174,7 +174,7 @@ export function submitSupportTicketApi(input: {
   email: string;
   topic: string;
   message: string;
-}): Promise<{ success: boolean; provider?: string; recipients?: string[] }> {
+}): Promise<{ success: boolean; provider?: string; recipients?: string[]; ticketNumber?: string }> {
   return apiFetch("/api/support/ticket", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

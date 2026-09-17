@@ -8,6 +8,7 @@ import {
   Mail,
   Printer,
   RefreshCw,
+  Save,
   ShieldCheck,
   Trash2,
 } from "lucide-react";
@@ -69,6 +70,8 @@ export function InspectionsPage() {
   const [dayLoading, setDayLoading] = useState(false);
   const [dayError, setDayError] = useState("");
   const [actionError, setActionError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveSuccessMsg, setSaveSuccessMsg] = useState("");
   const [emailSending, setEmailSending] = useState(false);
   const [emailSuccessMsg, setEmailSuccessMsg] = useState("");
 
@@ -92,6 +95,7 @@ export function InspectionsPage() {
     setDayLoading(true);
     setDayError("");
     setActionError("");
+    setSaveSuccessMsg("");
     try {
       const view = await fetchInspectionDay(homeId, dateStr);
       setDayView(view);
@@ -184,6 +188,31 @@ export function InspectionsPage() {
       await loadDay(selectedHomeId, dayView.date);
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Couldn't delete inspection.");
+    }
+  }
+
+  async function handleSaveAll() {
+    if (selectedHomeId === null || !dayView || dayView.items.length === 0) return;
+    setIsSaving(true);
+    setActionError("");
+    setSaveSuccessMsg("");
+    try {
+      await Promise.all(
+        dayView.items.map((item) =>
+          updateInspectionItem(selectedHomeId, dayView.date, item.work_category_id, {
+            work_status_id: item.work_status_id,
+            work_photo_pah_1: item.work_photo_pah_1 ?? "",
+            work_photo_pah_2: item.work_photo_pah_2 ?? "",
+            work_photo_pah_3: item.work_photo_pah_3 ?? "",
+            notes: item.notes ?? "",
+          }),
+        ),
+      );
+      setSaveSuccessMsg("Inspection saved successfully to database!");
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Couldn't save inspection.");
+    } finally {
+      setIsSaving(false);
     }
   }
 
@@ -371,6 +400,27 @@ export function InspectionsPage() {
             </div>
 
             <div className="flex items-center gap-2">
+              {dayView.items.length > 0 && dayView.canEditItems && (
+                <Button
+                  type="button"
+                  variant="default"
+                  disabled={isSaving}
+                  onClick={handleSaveAll}
+                  className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium shadow-sm"
+                >
+                  {isSaving ? (
+                    <>
+                      <Loader2 className="size-3.5 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="size-3.5" />
+                      Save
+                    </>
+                  )}
+                </Button>
+              )}
               {dayView.canRescheduleDay && (
                 <SchedulePopover
                   label="Reschedule"
@@ -392,6 +442,15 @@ export function InspectionsPage() {
             <p role="alert" className="mx-4 mt-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive print:hidden">
               {actionError}
             </p>
+          )}
+
+          {saveSuccessMsg && (
+            <div className="mx-4 mt-3 flex items-center justify-between rounded-md bg-emerald-500/10 border border-emerald-500/30 px-3 py-2 text-sm text-emerald-600 dark:text-emerald-400 print:hidden">
+              <span>{saveSuccessMsg}</span>
+              <button type="button" onClick={() => setSaveSuccessMsg("")} className="text-xs font-semibold hover:underline">
+                Dismiss
+              </button>
+            </div>
           )}
 
           {emailSuccessMsg && (
@@ -435,13 +494,13 @@ export function InspectionsPage() {
                 </div>
               )}
               <div className="overflow-x-auto">
-                <Table>
+                <Table className="table-fixed w-full">
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Item</TableHead>
-                      <TableHead className="w-[180px]">Status</TableHead>
-                      <TableHead>Photos</TableHead>
-                      <TableHead className="w-[250px]">Notes</TableHead>
+                      <TableHead className="w-1/4">Item</TableHead>
+                      <TableHead className="w-1/4">Status</TableHead>
+                      <TableHead className="w-1/4">Photos</TableHead>
+                      <TableHead className="w-1/4">Notes</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

@@ -174,6 +174,7 @@ export function HelpAboutPage() {
   const [supportTopic, setSupportTopic] = useState("general");
   const [supportMessage, setSupportMessage] = useState("");
   const [ticketSubmitted, setTicketSubmitted] = useState(false);
+  const [submittedTicketNumber, setSubmittedTicketNumber] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
 
@@ -193,14 +194,19 @@ export function HelpAboutPage() {
     if (!supportName || !supportEmail || !supportMessage) return;
     setSubmitting(true);
     setSubmitError("");
+    setTicketSubmitted(false);
+    setSubmittedTicketNumber("");
     try {
-      await submitSupportTicketApi({
+      const res = await submitSupportTicketApi({
         name: supportName,
         email: supportEmail,
         topic: supportTopic,
         message: supportMessage,
       });
       setTicketSubmitted(true);
+      if (res.ticketNumber) {
+        setSubmittedTicketNumber(res.ticketNumber);
+      }
       setSupportName("");
       setSupportEmail("");
       setSupportMessage("");
@@ -442,8 +448,14 @@ export function HelpAboutPage() {
                     <CheckCircle2 className="size-7" />
                   </div>
                   <h3 className="text-lg font-bold text-foreground">Ticket Received &amp; Emailed!</h3>
+                  {submittedTicketNumber && (
+                    <div className="rounded-lg bg-primary/10 border border-primary/20 px-5 py-2.5 text-center">
+                      <span className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wider block">Ticket Number</span>
+                      <span className="font-mono text-base font-extrabold text-primary">{submittedTicketNumber}</span>
+                    </div>
+                  )}
                   <p className="text-sm text-muted-foreground max-w-sm">
-                    Thank you! Your technical support ticket has been emailed to our support engineering team (<strong>tejaskumar96300@gmail.com</strong> &amp; <strong>ernest.bonat@gmail.com</strong>).
+                    Thank you! Your technical support ticket {submittedTicketNumber ? `(#${submittedTicketNumber}) ` : ""}has been emailed to our support engineering team (<strong>tejaskumar96300@gmail.com</strong> &amp; <strong>ernest.bonat@gmail.com</strong>).
                   </p>
                   <Button variant="outline" size="sm" onClick={() => setTicketSubmitted(false)}>
                     Submit Another Inquiry
@@ -583,7 +595,7 @@ export function HelpAboutPage() {
               <div className="rounded-xl border border-slate-700 bg-slate-800/80 p-4 space-y-2 text-right shrink-0">
                 <div className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Engineering Partner</div>
                 <div className="text-base font-bold text-white">BioGenAI Solutions LLC</div>
-                <div className="text-xs text-emerald-400 font-medium">Enterprise AI & Web Applications</div>
+                <div className="text-xs text-emerald-400 font-medium">Agentic AI Automation &amp; Web Applications Development.</div>
               </div>
             </div>
           </Card>
