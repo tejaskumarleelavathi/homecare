@@ -36,7 +36,7 @@ interface TopNavProps {
 
 export function TopNav({ activeTab, onTabChange, onLogout }: TopNavProps) {
   return (
-    <header className="sticky top-0 z-20 print:hidden">
+    <header className="sticky top-0 z-50 w-full border-b border-border/80 bg-background/95 backdrop-blur-md shadow-xs transition-shadow print:hidden">
       <div className="mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center gap-4 px-4 pt-3 sm:px-6">
         <button
           type="button"

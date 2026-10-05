@@ -570,7 +570,7 @@ export function InspectionsPage() {
                                 )}
                               </div>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="align-top">
                               {dayView.canEditItems ? (
                                 <>
                                   <div className="print:hidden">
@@ -579,7 +579,7 @@ export function InspectionsPage() {
                                       onChange={(e) => updateLocalItem(item.work_category_id, { notes: e.target.value })}
                                       onBlur={(e) => commitItemUpdate(item, { notes: e.target.value })}
                                       placeholder="Add notes..."
-                                      className="w-full text-xs min-h-[38px] h-[38px] resize-none"
+                                      className="w-full text-xs min-h-[68px] max-h-[140px] overflow-x-auto overflow-y-auto resize-y whitespace-pre-wrap leading-relaxed p-2.5 rounded-lg border border-input bg-background focus:ring-1 focus:ring-primary shadow-xs"
                                     />
                                   </div>
                                   <div className="hidden print:block text-xs whitespace-pre-wrap text-foreground font-medium">
@@ -587,7 +587,7 @@ export function InspectionsPage() {
                                   </div>
                                 </>
                               ) : (
-                                <div className="text-xs text-muted-foreground print:text-foreground print:font-medium whitespace-pre-wrap">
+                                <div className="text-xs text-muted-foreground print:text-foreground print:font-medium whitespace-pre-wrap max-h-[140px] overflow-x-auto overflow-y-auto p-1">
                                   {item.notes && item.notes.trim() ? item.notes : "—"}
                                 </div>
                               )}
