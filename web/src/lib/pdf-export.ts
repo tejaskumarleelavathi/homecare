@@ -272,7 +272,7 @@ export function exportInspectionPdf(
       border-bottom: 1px solid #cbd5e1;
     }
 
-    .item-cell { width: 30%; }
+    .item-cell { width: 20%; }
     .item-name { font-weight: 600; color: #0f172a; }
     .item-desc { font-size: 12px; color: #64748b; margin-top: 2px; }
 
@@ -292,7 +292,7 @@ export function exportInspectionPdf(
     .badge-incomplete { background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; }
     .badge-default { background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; }
 
-    .photos-cell { width: 25%; }
+    .photos-cell { width: 22%; }
     .photo-grid { display: flex; gap: 8px; flex-wrap: wrap; }
     .photo-grid img {
       width: 64px;
@@ -302,7 +302,7 @@ export function exportInspectionPdf(
       border: 1px solid #cbd5e1;
     }
 
-    .notes-cell { width: 30%; }
+    .notes-cell { width: 43%; }
     .notes-box {
       background: #f8fafc;
       border: 1px solid #e2e8f0;
@@ -326,6 +326,19 @@ export function exportInspectionPdf(
       justify-content: space-between;
       font-size: 11px;
       color: #94a3b8;
+    }
+
+    @page {
+      size: letter;
+      margin: 18mm 15mm 15mm 15mm;
+      @top-center {
+        content: "Page " counter(page);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        font-size: 10px;
+        font-weight: 600;
+        color: #64748b;
+        letter-spacing: 0.5px;
+      }
     }
 
     /* Print styles */
@@ -354,7 +367,16 @@ export function exportInspectionPdf(
         color: #000000 !important;
       }
       @page {
-        margin: 1.5cm;
+        size: letter;
+        margin: 18mm 15mm 15mm 15mm;
+        @top-center {
+          content: "Page " counter(page);
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+          font-size: 10px;
+          font-weight: 600;
+          color: #64748b;
+          letter-spacing: 0.5px;
+        }
       }
     }
   </style>

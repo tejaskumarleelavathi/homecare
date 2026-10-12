@@ -497,28 +497,28 @@ export function InspectionsPage() {
                 <Table className="table-fixed w-full">
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="w-1/4">Item</TableHead>
-                      <TableHead className="w-1/4">Status</TableHead>
-                      <TableHead className="w-1/4">Photos</TableHead>
-                      <TableHead className="w-1/4">Notes</TableHead>
+                      <TableHead className="w-[20%] pr-4">Item</TableHead>
+                      <TableHead className="w-[15%] px-3">Status</TableHead>
+                      <TableHead className="w-[22%] px-3">Photos</TableHead>
+                      <TableHead className="w-[43%] pl-4">Notes</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {groupedItems.map(([categoryName, items]) => (
                       <Fragment key={categoryName}>
                         <TableRow key={`group-${categoryName}`} className="bg-muted/40 hover:bg-muted/40">
-                          <TableCell colSpan={4} className="py-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+                          <TableCell colSpan={4} className="py-1.5 px-4 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
                             {categoryName}
                           </TableCell>
                         </TableRow>
                         {items.map((item) => (
                           <TableRow key={item.work_category_id}>
-                            <TableCell>
+                            <TableCell className="align-top pr-4">
                               <span className="font-medium" title={item.category_description}>
                                 {item.category_item}
                               </span>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="align-top px-3">
                               {dayView.canEditItems ? (
                                 <>
                                   <Select
@@ -527,7 +527,7 @@ export function InspectionsPage() {
                                       commitItemUpdate(item, { work_status_id: Number(v) })
                                     }
                                   >
-                                    <SelectTrigger className="w-full print:hidden">
+                                    <SelectTrigger className="w-full max-w-[140px] print:hidden">
                                       <SelectValue placeholder="Set status" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -552,7 +552,7 @@ export function InspectionsPage() {
                                 </Badge>
                               )}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="align-top px-3">
                               <div className="flex flex-wrap gap-2 print:flex-nowrap">
                                 {(["work_photo_pah_1", "work_photo_pah_2", "work_photo_pah_3"] as const).map(
                                   (field, idx) => (
@@ -570,7 +570,7 @@ export function InspectionsPage() {
                                 )}
                               </div>
                             </TableCell>
-                            <TableCell className="align-top">
+                            <TableCell className="align-top pl-4">
                               {dayView.canEditItems ? (
                                 <>
                                   <div className="print:hidden">
@@ -579,7 +579,7 @@ export function InspectionsPage() {
                                       onChange={(e) => updateLocalItem(item.work_category_id, { notes: e.target.value })}
                                       onBlur={(e) => commitItemUpdate(item, { notes: e.target.value })}
                                       placeholder="Add notes..."
-                                      className="w-full text-xs min-h-[68px] max-h-[140px] overflow-x-auto overflow-y-auto resize-y whitespace-pre-wrap leading-relaxed p-2.5 rounded-lg border border-input bg-background focus:ring-1 focus:ring-primary shadow-xs"
+                                      className="w-full text-xs min-h-[64px] max-h-[140px] overflow-x-auto overflow-y-auto resize-y whitespace-pre-wrap leading-relaxed p-2.5 rounded-lg border border-input bg-background focus:ring-1 focus:ring-primary shadow-xs"
                                     />
                                   </div>
                                   <div className="hidden print:block text-xs whitespace-pre-wrap text-foreground font-medium">
