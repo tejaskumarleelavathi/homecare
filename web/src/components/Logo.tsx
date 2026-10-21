@@ -2,8 +2,8 @@ import { cn } from "@/lib/utils";
 
 const SIZES = {
   sm: { icon: "size-8", wordmark: "text-base", tagline: "text-[9px]", gap: "gap-2" },
-  md: { icon: "size-11", wordmark: "text-2xl", tagline: "text-xs", gap: "gap-3" },
-  lg: { icon: "size-14", wordmark: "text-3xl", tagline: "text-sm", gap: "gap-3" },
+  md: { icon: "size-8 sm:size-11", wordmark: "text-lg sm:text-2xl", tagline: "text-xs", gap: "gap-2 sm:gap-3" },
+  lg: { icon: "size-12 sm:size-14", wordmark: "text-2xl sm:text-3xl", tagline: "text-sm", gap: "gap-3" },
 } as const;
 
 interface LogoProps {
@@ -22,9 +22,11 @@ export function Logo({ size = "md", showTagline = true, className }: LogoProps) 
         <circle cx="25" cy="20" r="11" fill="none" stroke="#1e293b" strokeWidth="3.5" />
       </svg>
       <div className="flex flex-col leading-none">
-        <span className={cn("font-bold tracking-tight text-foreground", s.wordmark)}>ABC</span>
+        <span className={cn("font-bold tracking-tight text-foreground whitespace-nowrap", s.wordmark)}>
+          ABC Construction
+        </span>
         {showTagline && (
-          <span className={cn("font-medium tracking-wide text-muted-foreground uppercase", s.tagline)}>
+          <span className={cn("font-medium tracking-wide text-muted-foreground uppercase mt-1", s.tagline)}>
             Home Care
           </span>
         )}
