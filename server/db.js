@@ -2,16 +2,45 @@ import pg from "pg";
 import fs from "node:fs";
 import path from "node:path";
 
-const connectionString = process.env.DATABASE_URL;
-const isSupabase = connectionString && connectionString.includes("supabase.co");
+const primaryUrl = process.env.DATABASE_URL;
+const localUrl = "postgresql://postgres:postgres@localhost:5432/homecare";
 
-export const pool = new pg.Pool({
-  connectionString,
-  ssl: isSupabase ? { rejectUnauthorized: false } : false,
+function createPgPool(url) {
+  const isSupabase = url && (url.includes("supabase.co") || url.includes("supabase.com"));
+  return new pg.Pool({
+    connectionString: url,
+    ssl: isSupabase ? { rejectUnauthorized: false } : false,
+    connectionTimeoutMillis: 5000,
+  });
+}
+
+let activePool = createPgPool(primaryUrl || localUrl);
+
+// Proxy pool to allow transparent fallback if primary connection fails
+export const pool = new Proxy({}, {
+  get(_target, prop) {
+    const val = activePool[prop];
+    if (typeof val === "function") {
+      return val.bind(activePool);
+    }
+    return val;
+  },
 });
+
+export const USER_COLUMNS = [
+  "user_id",
+  "username",
+  "company_name",
+  "email",
+  "password",
+  "expire_date",
+  "created_at",
+  "updated_at",
+];
 
 export const HOME_COLUMNS = [
   "home_id",
+  "user_id",
   "street",
   "city",
   "state",
@@ -176,10 +205,56 @@ export async function backfillMissingSchedules() {
   return res.rows.length;
 }
 
+export function formatUserRow(row) {
+  if (!row) return row;
+  let expireDateStr = null;
+  if (row.expire_date) {
+    if (typeof row.expire_date === "string") {
+      expireDateStr = row.expire_date.slice(0, 10);
+    } else if (row.expire_date instanceof Date) {
+      const y = row.expire_date.getUTCFullYear();
+      const m = String(row.expire_date.getUTCMonth() + 1).padStart(2, "0");
+      const d = String(row.expire_date.getUTCDate()).padStart(2, "0");
+      expireDateStr = `${y}-${m}-${d}`;
+    } else {
+      expireDateStr = String(row.expire_date).slice(0, 10);
+    }
+  }
+  return {
+    ...row,
+    expire_date: expireDateStr,
+  };
+}
+
 export async function initDb() {
+  try {
+    await activePool.query("SELECT 1");
+  } catch (err) {
+    if (primaryUrl && primaryUrl !== localUrl) {
+      console.warn("Primary database connection failed (e.g. Supabase paused), falling back to local PostgreSQL:", err.message);
+      activePool = createPgPool(localUrl);
+      await activePool.query("SELECT 1");
+      console.log("Connected to local PostgreSQL fallback successfully.");
+    } else {
+      throw err;
+    }
+  }
+
   await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      user_id SERIAL PRIMARY KEY,
+      username VARCHAR(255) NOT NULL UNIQUE,
+      company_name TEXT NOT NULL,
+      email VARCHAR(255) NOT NULL UNIQUE,
+      password TEXT NOT NULL,
+      expire_date DATE NOT NULL,
+      created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
+
     CREATE TABLE IF NOT EXISTS home (
       home_id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES users (user_id) ON DELETE CASCADE ON UPDATE CASCADE,
       street TEXT NOT NULL,
       city TEXT NOT NULL,
       state VARCHAR(2) NOT NULL CHECK (length(state) = 2),
@@ -216,9 +291,33 @@ export async function initDb() {
     );
   `);
 
+  // Migration: Add user_id column if home table already existed without it
+  await pool.query(`
+    ALTER TABLE home ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users (user_id) ON DELETE CASCADE ON UPDATE CASCADE;
+  `);
+
   // Migration: Add notes column if table already existed without it
   await pool.query(`
     ALTER TABLE work_category ADD COLUMN IF NOT EXISTS notes TEXT;
+  `);
+
+  // Seed default user 1 (BioGenAI Solutions)
+  const userCheck = await pool.query("SELECT user_id FROM users WHERE user_id = 1");
+  if (userCheck.rows.length === 0) {
+    await pool.query(`
+      INSERT INTO users (user_id, username, company_name, email, password, expire_date)
+      VALUES (1, 'ernest', 'BioGenAI Solutions', 'ernest.bonat@gmail.com', 'Password1', '2027-12-31')
+      ON CONFLICT (user_id) DO NOTHING;
+    `);
+    await pool.query(`
+      SELECT setval(pg_get_serial_sequence('users', 'user_id'), COALESCE((SELECT MAX(user_id) FROM users), 1));
+    `);
+    console.log("Seeded default user ID 1: BioGenAI Solutions (ernest / ernest.bonat@gmail.com, exp: 2027-12-31).");
+  }
+
+  // Update present home records to point to user_id = 1
+  await pool.query(`
+    UPDATE home SET user_id = 1 WHERE user_id IS NULL OR user_id = 0;
   `);
 
   // Seed statuses
@@ -232,5 +331,20 @@ export async function initDb() {
       ('Pending', 'Work has not started')
     `);
     console.log("Seeded default work statuses in PostgreSQL.");
+  }
+
+  // Seed initial 2 homes for user_id = 1 if table home is completely empty
+  const homeCheck = await pool.query("SELECT COUNT(*) FROM home");
+  if (parseInt(homeCheck.rows[0].count, 10) === 0) {
+    await pool.query(`
+      INSERT INTO home (home_id, user_id, street, city, state, zip_code, emails, notes) VALUES
+      (1, 1, '2349 North Chamberlain Blvd', 'North Port', 'FL', '34286', 'ernest.bonat@gmail.com', ''),
+      (2, 1, '482 Maple Bridge', 'Phoenix', 'AZ', '28281', 'hello@gmail.com', 'House in Maple Bridge')
+      ON CONFLICT (home_id) DO NOTHING;
+    `);
+    await pool.query(`
+      SELECT setval(pg_get_serial_sequence('home', 'home_id'), COALESCE((SELECT MAX(home_id) FROM home), 2));
+    `);
+    console.log("Seeded initial 2 home records pointed to user ID 1.");
   }
 }

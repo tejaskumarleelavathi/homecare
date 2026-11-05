@@ -8,12 +8,15 @@ const SIZES = {
 
 interface LogoProps {
   size?: keyof typeof SIZES;
+  companyName?: string | null;
   showTagline?: boolean;
   className?: string;
 }
 
-export function Logo({ size = "md", showTagline = true, className }: LogoProps) {
+export function Logo({ size = "md", companyName, showTagline = true, className }: LogoProps) {
   const s = SIZES[size];
+  const displayName = companyName && companyName.trim() ? companyName.trim() : "Home Care";
+  const displayTagline = companyName && companyName.trim() ? "Home Care" : null;
 
   return (
     <div className={cn("flex items-center", s.gap, className)}>
@@ -23,11 +26,11 @@ export function Logo({ size = "md", showTagline = true, className }: LogoProps) 
       </svg>
       <div className="flex flex-col leading-none">
         <span className={cn("font-bold tracking-tight text-foreground whitespace-nowrap", s.wordmark)}>
-          ABC Construction
+          {displayName}
         </span>
-        {showTagline && (
+        {showTagline && displayTagline && (
           <span className={cn("font-medium tracking-wide text-muted-foreground uppercase mt-1", s.tagline)}>
-            Home Care
+            {displayTagline}
           </span>
         )}
       </div>

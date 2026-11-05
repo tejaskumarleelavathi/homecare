@@ -1,5 +1,6 @@
 export interface Home {
   home_id: number;
+  user_id?: number;
   street: string;
   city: string;
   state: string;
@@ -11,6 +12,7 @@ export interface Home {
 }
 
 export interface HomeInput {
+  user_id?: number;
   street: string;
   city: string;
   state: string;

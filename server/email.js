@@ -28,7 +28,7 @@ function getStatusClass(statusName) {
   return "badge-default";
 }
 
-export function buildExactInspectionReportHtml({ home, dateStr, items, statusesMap }) {
+export function buildExactInspectionReportHtml({ home, dateStr, items, statusesMap, companyName = "BioGenAI Solutions" }) {
   const addressStr = home
     ? `${home.street}, ${home.city}, ${home.state} ${home.zip_code}`
     : "Home Inspection Report";
@@ -335,7 +335,7 @@ export function buildExactInspectionReportHtml({ home, dateStr, items, statusesM
   <div class="report-container">
     <div class="header">
       <div>
-        <div class="brand-title">HomeCare Inspection</div>
+        <div class="brand-title">${escapeHtml(companyName)} Inspection</div>
         <div class="brand-subtitle">Property Quality &amp; Maintenance Record</div>
       </div>
       <div class="property-box">
@@ -385,7 +385,15 @@ export function buildExactInspectionReportHtml({ home, dateStr, items, statusesM
 </html>`;
 }
 
-export async function sendInspectionReportEmail({ home, dateStr, items, statusesMap, recipientEmail }) {
+export async function sendInspectionReportEmail({
+  home,
+  dateStr,
+  items,
+  statusesMap,
+  recipientEmail,
+  companyName = "BioGenAI Solutions",
+  companyEmail = "ernest.bonat@gmail.com",
+}) {
   // Use recipient specified, or target home's listed emails
   const targetEmail = (recipientEmail || home?.emails || "").trim();
   if (!targetEmail) {
@@ -394,14 +402,14 @@ export async function sendInspectionReportEmail({ home, dateStr, items, statuses
 
   const dateFormatted = formatDateStr(dateStr);
   const addressStr = home ? `${home.street}, ${home.city}, ${home.state} ${home.zip_code}` : "Property";
-  const subject = `HomeCare Inspection Report - ${home ? home.street : "Property"} (${dateFormatted})`;
+  const subject = `${companyName} HomeCare Inspection Report - ${home ? home.street : "Property"} (${dateFormatted})`;
 
   // Generate exact HTML document matching export view 100%
-  const exactReportHtml = buildExactInspectionReportHtml({ home, dateStr, items, statusesMap });
+  const exactReportHtml = buildExactInspectionReportHtml({ home, dateStr, items, statusesMap, companyName });
 
   const emailCoverHtml = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b; line-height: 1.5; padding: 24px; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
-      <h2 style="color: #0f172a; margin-top: 0; border-bottom: 2px solid #0f172a; padding-bottom: 12px; font-size: 20px;">HomeCare Inspection Report</h2>
+      <h2 style="color: #0f172a; margin-top: 0; border-bottom: 2px solid #0f172a; padding-bottom: 12px; font-size: 20px;">${escapeHtml(companyName)} Inspection Report</h2>
       <p style="font-size: 14px; color: #334155;">Hello,</p>
       <p style="font-size: 14px; color: #334155;">Please find attached the official HomeCare Inspection Report for your property:</p>
       <div style="background-color: #f1f5f9; padding: 14px 18px; border-radius: 8px; margin: 16px 0; font-size: 13px;">
@@ -413,8 +421,8 @@ export async function sendInspectionReportEmail({ home, dateStr, items, statuses
       <br/>
       <p style="font-size: 13px; color: #475569; border-top: 1px solid #e2e8f0; padding-top: 14px; margin-bottom: 0;">
         Best regards,<br/>
-        <strong style="color: #0f172a;">ABC Constructions Home Care Team</strong><br/>
-        <span style="font-size: 12px; color: #64748b;">info@abcconstructions.com</span>
+        <strong style="color: #0f172a;">${escapeHtml(companyName)} Home Care Team</strong><br/>
+        <span style="font-size: 12px; color: #64748b;">${escapeHtml(companyEmail)}</span>
       </p>
     </div>
   `;
@@ -431,9 +439,10 @@ export async function sendInspectionReportEmail({ home, dateStr, items, statuses
         },
         body: JSON.stringify({
           sender: {
-            name: "ABC HomeCare",
+            name: `${companyName} via Home Care`,
             email: process.env.BREVO_SENDER_EMAIL || "kltejas5@gmail.com",
           },
+          replyTo: companyEmail ? { email: companyEmail, name: companyName } : undefined,
           to: [{ email: targetEmail }],
           subject: subject,
           htmlContent: emailCoverHtml,

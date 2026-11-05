@@ -1,4 +1,4 @@
-import { CalendarCheck, ClipboardList, HelpCircle, Home as HomeIcon, HousePlus, LogOut, User } from "lucide-react";
+import { CalendarCheck, ClipboardList, HelpCircle, Home as HomeIcon, HousePlus, LogOut } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Logo } from "@/components/Logo";
@@ -7,7 +7,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
@@ -28,13 +27,16 @@ const NAV_ITEMS: NavItem[] = [
   { key: "help", label: "Help & About", icon: HelpCircle, enabled: true },
 ];
 
+import type { User as UserType } from "@/types/user";
+
 interface TopNavProps {
+  user: UserType;
   activeTab: NavKey;
   onTabChange: (key: NavKey) => void;
   onLogout: () => void;
 }
 
-export function TopNav({ activeTab, onTabChange, onLogout }: TopNavProps) {
+export function TopNav({ user, activeTab, onTabChange, onLogout }: TopNavProps) {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/80 bg-background/95 backdrop-blur-md shadow-xs transition-shadow print:hidden">
       <div className="mx-auto grid max-w-7xl grid-cols-[1fr_auto_1fr] items-center gap-4 px-4 pt-3 sm:px-6">
@@ -42,9 +44,9 @@ export function TopNav({ activeTab, onTabChange, onLogout }: TopNavProps) {
           type="button"
           onClick={() => onTabChange("home")}
           className="justify-self-start cursor-pointer text-left transition-opacity hover:opacity-80 focus:outline-none"
-          title="Go to Home"
+          title={`Go to ${user.company_name} Home`}
         >
-          <Logo showTagline={false} />
+          <Logo companyName={user.company_name} showTagline={true} />
         </button>
 
         <button
@@ -67,17 +69,21 @@ export function TopNav({ activeTab, onTabChange, onLogout }: TopNavProps) {
                 className="flex items-center gap-2 rounded-full p-0.5 pr-2 transition-colors hover:bg-muted"
               >
                 <Avatar className="size-7">
-                  <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                    <User className="size-3.5" />
+                  <AvatarFallback className="bg-primary text-primary-foreground text-xs font-semibold uppercase">
+                    {user.username?.charAt(0) || user.company_name?.charAt(0) || "U"}
                   </AvatarFallback>
                 </Avatar>
-                <span className="hidden text-sm font-medium sm:inline">Admin</span>
+                <span className="hidden text-sm font-medium sm:inline">{user.username}</span>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuLabel className="text-xs text-muted-foreground">
-                admin@homecare.com
-              </DropdownMenuLabel>
+            <DropdownMenuContent align="end" className="w-56">
+              <div className="px-2 py-1.5">
+                <p className="text-xs font-semibold text-foreground">{user.company_name}</p>
+                <p className="text-[11px] text-muted-foreground truncate">{user.email}</p>
+                <div className="mt-1.5 inline-flex items-center rounded-sm bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                  Trial valid until {user.expire_date}
+                </div>
+              </div>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={onLogout} variant="destructive">
                 <LogOut className="size-4" />

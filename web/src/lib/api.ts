@@ -1,14 +1,30 @@
 import type { Home, HomeInput } from "@/types/home";
 import type { WorkStatus, WorkStatusInput } from "@/types/work-status";
 import type { InspectionDayView, InspectionItem, InspectionItemUpdate } from "@/types/inspection";
+import type { User } from "@/types/user";
 import { todayStr } from "@/lib/date";
 
 export class ApiError extends Error {}
+
+export function getStoredUser(): User | null {
+  try {
+    const raw = localStorage.getItem("homecare_user");
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
 
 function getClientHeaders(extra?: HeadersInit): Record<string, string> {
   const result: Record<string, string> = {
     "X-Client-Today": todayStr(),
   };
+
+  const storedUser = getStoredUser();
+  if (storedUser?.user_id) {
+    result["X-User-Id"] = String(storedUser.user_id);
+  }
+
   try {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     if (tz) result["X-Client-Timezone"] = tz;
@@ -50,8 +66,24 @@ async function parseResponse<T>(res: Response): Promise<T> {
   return body as T;
 }
 
-export function fetchHomes(): Promise<Home[]> {
-  return apiFetch("/api/homes").then((res) => parseResponse<Home[]>(res));
+export function loginApi(credentials: {
+  username: string;
+  password: string;
+}): Promise<{ user: User }> {
+  return apiFetch("/api/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(credentials),
+  }).then((res) => parseResponse<{ user: User }>(res));
+}
+
+export function fetchCurrentUserApi(): Promise<{ user: User }> {
+  return apiFetch("/api/auth/me").then((res) => parseResponse<{ user: User }>(res));
+}
+
+export function fetchHomes(userId?: number): Promise<Home[]> {
+  const query = userId ? `?user_id=${userId}` : "";
+  return apiFetch(`/api/homes${query}`).then((res) => parseResponse<Home[]>(res));
 }
 
 export function createHome(input: HomeInput): Promise<Home> {

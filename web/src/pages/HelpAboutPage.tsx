@@ -162,15 +162,22 @@ const FAQS = [
   },
 ];
 
-export function HelpAboutPage() {
+import type { User } from "@/types/user";
+
+interface HelpAboutPageProps {
+  user?: User | null;
+}
+
+export function HelpAboutPage({ user }: HelpAboutPageProps = {}) {
+  const companyName = user?.company_name || "Home Care";
   const [activeSubTab, setActiveSubTab] = useState<SubTab>("manual");
   const [searchQuery, setSearchQuery] = useState("");
   const [expandedFaq, setExpandedFaq] = useState<number | null>(0);
   const [expandedGuide, setExpandedGuide] = useState<string | null>("home-management");
 
-  // Support form state
-  const [supportName, setSupportName] = useState("");
-  const [supportEmail, setSupportEmail] = useState("");
+  // Support form state - prefilled with current company user details
+  const [supportName, setSupportName] = useState(user?.username || "");
+  const [supportEmail, setSupportEmail] = useState(user?.email || "");
   const [supportTopic, setSupportTopic] = useState("general");
   const [supportMessage, setSupportMessage] = useState("");
   const [ticketSubmitted, setTicketSubmitted] = useState(false);
@@ -238,7 +245,7 @@ export function HelpAboutPage() {
               Help & Information Center
             </h1>
             <p className="max-w-2xl text-base text-muted-foreground">
-              Complete user guides, technical support assistance, and system documentation for ABC Home Care.
+              Complete user guides, technical support assistance, and system documentation for {companyName}.
             </p>
           </div>
 
@@ -583,12 +590,12 @@ export function HelpAboutPage() {
                     <Building2 className="size-7" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-extrabold tracking-tight">ABC Constructions</h2>
+                    <h2 className="text-2xl font-extrabold tracking-tight">{companyName}</h2>
                     <p className="text-sm text-slate-300">Home Care & Property Quality Assurance System</p>
                   </div>
                 </div>
                 <p className="text-sm text-slate-300 max-w-xl leading-relaxed">
-                  ABC Constructions delivers premier residential craftsmanship and rigorous property inspection management. Our Home Care platform ensures that every home inspection is tracked, verified with photographic evidence, and documented seamlessly.
+                  {companyName} delivers premier residential craftsmanship and rigorous property inspection management. Our Home Care platform ensures that every home inspection is tracked, verified with photographic evidence, and documented seamlessly.
                 </p>
               </div>
 

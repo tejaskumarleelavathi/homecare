@@ -33,7 +33,9 @@ function deleteCloudinaryImage(url) {
 import {
   pool,
   formatCategoryRow,
+  formatUserRow,
   initDb,
+  USER_COLUMNS,
   HOME_COLUMNS,
   WORK_STATUS_COLUMNS,
   WORK_CATEGORY_COLUMNS,
@@ -73,6 +75,106 @@ const upload = multer({
   },
 });
 
+// --- Authentication & User Management ---
+app.post("/api/auth/login", async (req, res) => {
+  const { username, password } = req.body || {};
+  if (!username || !password) {
+    return res.status(400).json({ errors: ["Username/Email and password are required."] });
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT ${USER_COLUMNS.join(", ")} FROM users
+       WHERE LOWER(username) = LOWER($1) OR LOWER(email) = LOWER($1)`,
+      [String(username).trim()]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ errors: ["Invalid username or password."] });
+    }
+
+    const user = formatUserRow(result.rows[0]);
+
+    if (user.password !== String(password)) {
+      return res.status(401).json({ errors: ["Invalid username or password."] });
+    }
+
+    const today = getTodayStr(req);
+    if (user.expire_date && user.expire_date < today) {
+      return res.status(403).json({
+        errors: [`Trial subscription expired on ${user.expire_date}. Please contact your administrator.`],
+      });
+    }
+
+    const { password: _, ...safeUser } = user;
+    res.json({ user: safeUser });
+  } catch (err) {
+    res.status(500).json({ errors: [err.message] });
+  }
+});
+
+app.get("/api/auth/me", async (req, res) => {
+  const userId = req.headers["x-user-id"] || req.query.user_id;
+  if (!userId) {
+    return res.status(401).json({ errors: ["Unauthenticated."] });
+  }
+
+  try {
+    const result = await pool.query(
+      `SELECT ${USER_COLUMNS.join(", ")} FROM users WHERE user_id = $1`,
+      [Number(userId)]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ errors: ["User not found."] });
+    }
+
+    const user = formatUserRow(result.rows[0]);
+    const { password: _, ...safeUser } = user;
+    res.json({ user: safeUser });
+  } catch (err) {
+    res.status(500).json({ errors: [err.message] });
+  }
+});
+
+app.get("/api/users", async (_req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT user_id, username, company_name, email, expire_date, created_at, updated_at
+       FROM users ORDER BY user_id`
+    );
+    res.json(result.rows.map(formatUserRow));
+  } catch (err) {
+    res.status(500).json({ errors: [err.message] });
+  }
+});
+
+app.post("/api/users", async (req, res) => {
+  const { username, company_name, email, password, expire_date } = req.body || {};
+  if (!username || !company_name || !email || !password || !expire_date) {
+    return res.status(400).json({
+      errors: ["Username, company name, email, password, and expire date are required."],
+    });
+  }
+
+  try {
+    const insertRes = await pool.query(
+      `INSERT INTO users (username, company_name, email, password, expire_date)
+       VALUES ($1, $2, $3, $4, $5) RETURNING user_id`,
+      [String(username).trim(), String(company_name).trim(), String(email).trim().toLowerCase(), String(password), String(expire_date).slice(0, 10)]
+    );
+    const newUserId = insertRes.rows[0].user_id;
+    const selectRes = await pool.query(
+      `SELECT ${USER_COLUMNS.join(", ")} FROM users WHERE user_id = $1`,
+      [newUserId]
+    );
+    const { password: _, ...safeUser } = formatUserRow(selectRes.rows[0]);
+    res.status(201).json({ user: safeUser });
+  } catch (err) {
+    res.status(400).json({ errors: [err.message] });
+  }
+});
+
 function normalizeHomeInput(body) {
   const street = String(body.street ?? "").trim();
   const city = String(body.city ?? "").trim();
@@ -90,11 +192,20 @@ function normalizeHomeInput(body) {
   return { errors, values: { street, city, state, zip_code, emails, notes } };
 }
 
-app.get("/api/homes", async (_req, res) => {
+app.get("/api/homes", async (req, res) => {
   try {
-    const result = await pool.query(
-      `SELECT ${HOME_COLUMNS.join(", ")} FROM home ORDER BY home_id`
-    );
+    const userId = req.query.user_id || req.query.userId || req.headers["x-user-id"];
+    let result;
+    if (userId) {
+      result = await pool.query(
+        `SELECT ${HOME_COLUMNS.join(", ")} FROM home WHERE user_id = $1 ORDER BY home_id`,
+        [Number(userId)]
+      );
+    } else {
+      result = await pool.query(
+        `SELECT ${HOME_COLUMNS.join(", ")} FROM home ORDER BY home_id`
+      );
+    }
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ errors: [err.message] });
@@ -107,14 +218,17 @@ app.post("/api/homes", async (req, res) => {
     return res.status(400).json({ errors });
   }
 
+  const userId = Number(req.body.user_id || req.headers["x-user-id"] || 1);
+
   const client = await pool.connect();
   try {
     await client.query("BEGIN");
 
     const insertResult = await client.query(
-      `INSERT INTO home (street, city, state, zip_code, emails, notes)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING home_id`,
+      `INSERT INTO home (user_id, street, city, state, zip_code, emails, notes)
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING home_id`,
       [
+        userId,
         values.street,
         values.city,
         values.state,
@@ -448,6 +562,20 @@ app.post("/api/homes/:homeId/inspections/:date/send-email", async (req, res) => 
 
   const recipientEmail = req.body?.recipientEmail;
 
+  // Lookup company branding of the home's user
+  let companyName = "BioGenAI Solutions";
+  let companyEmail = "ernest.bonat@gmail.com";
+  if (home.user_id) {
+    const userRes = await pool.query(
+      "SELECT company_name, email FROM users WHERE user_id = $1",
+      [home.user_id]
+    );
+    if (userRes.rows.length > 0) {
+      companyName = userRes.rows[0].company_name || companyName;
+      companyEmail = userRes.rows[0].email || companyEmail;
+    }
+  }
+
   try {
     const result = await sendInspectionReportEmail({
       home,
@@ -455,6 +583,8 @@ app.post("/api/homes/:homeId/inspections/:date/send-email", async (req, res) => 
       items,
       statusesMap,
       recipientEmail,
+      companyName,
+      companyEmail,
     });
     res.json(result);
   } catch (err) {

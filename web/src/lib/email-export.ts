@@ -4,18 +4,23 @@ import type { WorkStatus } from "@/types/work-status";
 import { formatDateStr } from "@/lib/date";
 import { exportInspectionPdf } from "@/lib/pdf-export";
 
+import { getStoredUser } from "@/lib/api";
+
 export function sendInspectionEmail(
   home: Home | null,
   dayView: InspectionDayView,
   statuses: WorkStatus[],
 ) {
+  const user = getStoredUser();
+  const companyName = user?.company_name || "Home Care";
+  const companyEmail = user?.email || "";
   const toEmail = home?.emails ? home.emails.trim() : "";
   const addressStr = home
     ? `${home.street}, ${home.city}, ${home.state} ${home.zip_code}`
     : "Home Inspection";
   const dateFormatted = formatDateStr(dayView.date);
 
-  const subject = `HomeCare Inspection Report - ${home ? home.street : "Property"} (${dateFormatted})`;
+  const subject = `${companyName} HomeCare Inspection Report - ${home ? home.street : "Property"} (${dateFormatted})`;
 
   const body = `Hello,
 
@@ -30,10 +35,8 @@ ${home?.notes ? `Property Notes:\n${home.notes}\n\n` : ""}Please attach the gene
 
 Best regards,
 
-ABC Constructions Home Care Team
-Sender: info@abcconstructions.com
-Contact: support@abcconstructions.com
-`;
+${companyName} Home Care Team
+${companyEmail ? `Contact: ${companyEmail}\n` : ""}`;
 
   // First open the PDF report in a new tab so the user has the report ready to save/attach
   exportInspectionPdf(home, dayView, statuses);

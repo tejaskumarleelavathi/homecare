@@ -14,68 +14,75 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { loginApi, ApiError } from "@/lib/api";
+import type { User } from "@/types/user";
 
-const DEMO_EMAIL = "admin@homecare.com";
-const DEMO_PASSWORD = "homecare2026";
+const DEMO_USER = "ernest";
+const DEMO_PASSWORD = "Password1";
 
 interface LoginPageProps {
-  onLogin: () => void;
+  onLogin: (user: User) => void;
 }
 
 export function LoginPage({ onLogin }: LoginPageProps) {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [remember, setRemember] = useState(true);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
-    setIsSubmitting(true);
 
-    window.setTimeout(() => {
-      if (email.trim().toLowerCase() === DEMO_EMAIL && password === DEMO_PASSWORD) {
-        onLogin();
-      } else {
-        setError("Invalid email or password. Try the demo credentials below.");
-        setIsSubmitting(false);
-      }
-    }, 500);
+    const trimmedUser = username.trim();
+    if (!trimmedUser || !password) {
+      setError("Please enter both username/email and password.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const { user } = await loginApi({ username: trimmedUser, password });
+      onLogin(user);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Failed to sign in. Please verify your credentials.");
+      setIsSubmitting(false);
+    }
   }
 
   function fillDemoCredentials() {
-    setEmail(DEMO_EMAIL);
+    setUsername(DEMO_USER);
     setPassword(DEMO_PASSWORD);
     setError("");
   }
 
   return (
-    <div className="relative flex min-h-svh items-center justify-center overflow-hidden p-6">
+    <div className="relative flex min-h-svh items-center justify-center overflow-hidden p-6 bg-muted/20">
       <div className="relative flex w-full max-w-sm flex-col items-center gap-8">
         <Logo size="lg" />
 
         <Card className="w-full border-border/60 shadow-lg shadow-black/[0.04]">
           <CardHeader className="space-y-1.5 text-center">
             <CardTitle className="text-2xl font-semibold tracking-tight">
-              Welcome back
+              Welcome to Home Care
             </CardTitle>
             <CardDescription>
-              Sign in to manage your homes and inspections
+              Sign in with your company account
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4" noValidate>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="username">Username or Email</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  autoComplete="email"
-                  placeholder="you@homecare.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="username"
+                  type="text"
+                  autoComplete="username"
+                  placeholder="ernest or ernest.bonat@gmail.com"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
                   aria-invalid={Boolean(error)}
                   required
                 />
@@ -163,16 +170,19 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             "w-full rounded-lg border border-border bg-muted/40 px-4 py-3 text-center text-xs text-muted-foreground",
           )}
         >
-          <p className="font-medium text-foreground/80">Demo credentials</p>
+          <p className="font-medium text-foreground/80">BioGenAI Solutions (Demo Access)</p>
           <p className="mt-1">
-            {DEMO_EMAIL} &middot; {DEMO_PASSWORD}
+            Username: <span className="font-semibold text-foreground">ernest</span> &middot; Password: <span className="font-semibold text-foreground">Password1</span>
+          </p>
+          <p className="text-[11px] text-muted-foreground mt-0.5">
+            Email: ernest.bonat@gmail.com &middot; Exp: Dec 31, 2027
           </p>
           <button
             type="button"
             onClick={fillDemoCredentials}
             className="mt-2 font-medium text-primary hover:underline"
           >
-            Autofill
+            Autofill BioGenAI Account
           </button>
         </div>
       </div>

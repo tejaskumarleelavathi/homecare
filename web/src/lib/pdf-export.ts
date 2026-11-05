@@ -2,12 +2,15 @@ import type { Home } from "@/types/home";
 import type { InspectionDayView, InspectionItem } from "@/types/inspection";
 import type { WorkStatus } from "@/types/work-status";
 import { formatDateStr } from "@/lib/date";
+import { getStoredUser } from "@/lib/api";
 
 export function exportInspectionPdf(
   home: Home | null,
   dayView: InspectionDayView,
   statuses: WorkStatus[],
 ) {
+  const user = getStoredUser();
+  const companyName = user?.company_name || "HomeCare";
   const printWindow = window.open("", "_blank");
   if (!printWindow) {
     alert("Please allow popups for this site to export the PDF.");
@@ -397,7 +400,7 @@ export function exportInspectionPdf(
   <div class="report-container">
     <div class="header">
       <div>
-        <div class="brand-title">HomeCare Inspection</div>
+        <div class="brand-title">${escapeHtml(companyName)} Inspection</div>
         <div class="brand-subtitle">Property Quality & Maintenance Record</div>
       </div>
       <div class="property-box">
