@@ -439,9 +439,14 @@ export function InspectionsPage() {
           </div>
 
           {actionError && (
-            <p role="alert" className="mx-4 mt-3 rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive print:hidden">
-              {actionError}
-            </p>
+            <div role="alert" className="mx-4 mt-3 rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive print:hidden">
+              <div className="font-medium">{actionError}</div>
+              {actionError.toLowerCase().includes("email") && (
+                <div className="mt-1 text-xs text-muted-foreground">
+                  Tip: You can use the <span className="font-medium text-foreground">Export PDF</span> button to view, download, or attach the report directly from your own mail app.
+                </div>
+              )}
+            </div>
           )}
 
           {saveSuccessMsg && (

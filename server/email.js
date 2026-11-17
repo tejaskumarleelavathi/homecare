@@ -457,12 +457,20 @@ export async function sendInspectionReportEmail({
 
       const data = await res.json();
       if (!res.ok) {
+        if (res.status === 401 || data.message === "Key not found") {
+          throw new Error(
+            "Brevo Email API Key not found or invalid. Please verify BREVO_API_KEY in your Render dashboard (or regenerate your API key in Brevo Settings > API Keys)."
+          );
+        }
         throw new Error(data.message || `Brevo email delivery error (${res.status})`);
       }
       return { success: true, provider: "Brevo", details: data, recipient: targetEmail };
     } catch (brevoErr) {
       console.error("Brevo delivery exception:", brevoErr);
-      throw brevoErr;
+      // If Resend is also configured, let it try falling back instead of dying immediately
+      if (!process.env.RESEND_API_KEY) {
+        throw brevoErr;
+      }
     }
   }
 
@@ -589,6 +597,9 @@ export async function sendSupportTicketEmail({ name, email, topic, message }) {
 
       const data = await res.json();
       if (!res.ok) {
+        if (res.status === 401 || data.message === "Key not found") {
+          throw new Error("Brevo Email API Key not found or invalid. Please verify BREVO_API_KEY in your server environment settings.");
+        }
         throw new Error(data.message || `Brevo email error (${res.status})`);
       }
       return { success: true, provider: "Brevo", details: data, recipients, ticketNumber };
