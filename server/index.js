@@ -218,7 +218,8 @@ app.post("/api/homes", async (req, res) => {
     return res.status(400).json({ errors });
   }
 
-  const userId = Number(req.body.user_id || req.headers["x-user-id"] || 1);
+  const rawUserId = req.body?.user_id ?? req.headers["x-user-id"];
+  const userId = rawUserId ? Number(rawUserId) : 1;
 
   const client = await pool.connect();
   try {

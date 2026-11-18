@@ -3,7 +3,7 @@ import { Loader2 } from "lucide-react";
 
 import type { Home, HomeInput } from "@/types/home";
 import { US_STATES } from "@/lib/us-states";
-import { createHome, updateHome, ApiError } from "@/lib/api";
+import { createHome, updateHome, ApiError, getStoredUser } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -71,7 +71,9 @@ export function HomeFormDialog({ open, onOpenChange, home, onSaved }: HomeFormDi
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
+    const storedUser = getStoredUser();
     const payload: HomeInput = {
+      ...(storedUser?.user_id ? { user_id: storedUser.user_id } : {}),
       street: form.street.trim(),
       city: form.city.trim(),
       state: form.state.trim(),

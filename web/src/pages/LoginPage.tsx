@@ -17,8 +17,22 @@ import {
 import { loginApi, ApiError } from "@/lib/api";
 import type { User } from "@/types/user";
 
-const DEMO_USER = "ernest";
-const DEMO_PASSWORD = "Password1";
+const DEMO_ACCOUNTS = [
+  {
+    company: "BioGenAI Solutions",
+    username: "ernest",
+    password: "Password1",
+    email: "ernest.bonat@gmail.com",
+    userId: 1,
+  },
+  {
+    company: "ABC Construction",
+    username: "abcusername",
+    password: "abcpassword",
+    email: "ernest.bonat@biogenaisolutions.com",
+    userId: 2,
+  },
+];
 
 interface LoginPageProps {
   onLogin: (user: User) => void;
@@ -52,9 +66,9 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     }
   }
 
-  function fillDemoCredentials() {
-    setUsername(DEMO_USER);
-    setPassword(DEMO_PASSWORD);
+  function fillAccount(acc: typeof DEMO_ACCOUNTS[number]) {
+    setUsername(acc.username);
+    setPassword(acc.password);
     setError("");
   }
 
@@ -167,23 +181,35 @@ export function LoginPage({ onLogin }: LoginPageProps) {
 
         <div
           className={cn(
-            "w-full rounded-lg border border-border bg-muted/40 px-4 py-3 text-center text-xs text-muted-foreground",
+            "w-full rounded-lg border border-border bg-muted/40 p-3.5 text-xs text-muted-foreground space-y-2.5",
           )}
         >
-          <p className="font-medium text-foreground/80">BioGenAI Solutions (Demo Access)</p>
-          <p className="mt-1">
-            Username: <span className="font-semibold text-foreground">ernest</span> &middot; Password: <span className="font-semibold text-foreground">Password1</span>
-          </p>
-          <p className="text-[11px] text-muted-foreground mt-0.5">
-            Email: ernest.bonat@gmail.com &middot; Exp: Dec 31, 2027
-          </p>
-          <button
-            type="button"
-            onClick={fillDemoCredentials}
-            className="mt-2 font-medium text-primary hover:underline"
-          >
-            Autofill BioGenAI Account
-          </button>
+          <div className="text-center font-medium text-foreground/80">Trial Access Accounts</div>
+
+          {DEMO_ACCOUNTS.map((acc) => (
+            <div
+              key={acc.userId}
+              className="rounded-md border border-border/60 bg-background/60 p-2.5 transition-colors hover:border-primary/40"
+            >
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-foreground">{acc.company}</span>
+                <span className="text-[10px] text-muted-foreground">User ID: {acc.userId}</span>
+              </div>
+              <p className="mt-1 text-[11px]">
+                User: <span className="font-medium text-foreground">{acc.username}</span> &middot; Pass: <span className="font-medium text-foreground">{acc.password}</span>
+              </p>
+              <p className="text-[10px] text-muted-foreground">
+                {acc.email} &middot; Exp: Dec 31, 2027
+              </p>
+              <button
+                type="button"
+                onClick={() => fillAccount(acc)}
+                className="mt-1.5 inline-block text-[11px] font-medium text-primary hover:underline"
+              >
+                Autofill {acc.company} &rarr;
+              </button>
+            </div>
+          ))}
         </div>
       </div>
     </div>

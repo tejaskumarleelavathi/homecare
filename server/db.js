@@ -315,6 +315,20 @@ export async function initDb() {
     console.log("Seeded default user ID 1: BioGenAI Solutions (ernest / ernest.bonat@gmail.com, exp: 2027-12-31).");
   }
 
+  // Seed user 2 (ABC Construction)
+  const user2Check = await pool.query("SELECT user_id FROM users WHERE user_id = 2");
+  if (user2Check.rows.length === 0) {
+    await pool.query(`
+      INSERT INTO users (user_id, username, company_name, email, password, expire_date)
+      VALUES (2, 'abcusername', 'ABC Construction', 'ernest.bonat@biogenaisolutions.com', 'abcpassword', '2027-12-31')
+      ON CONFLICT (user_id) DO NOTHING;
+    `);
+    await pool.query(`
+      SELECT setval(pg_get_serial_sequence('users', 'user_id'), COALESCE((SELECT MAX(user_id) FROM users), 2));
+    `);
+    console.log("Seeded user ID 2: ABC Construction (abcusername / ernest.bonat@biogenaisolutions.com, exp: 2027-12-31).");
+  }
+
   // Update present home records to point to user_id = 1
   await pool.query(`
     UPDATE home SET user_id = 1 WHERE user_id IS NULL OR user_id = 0;
