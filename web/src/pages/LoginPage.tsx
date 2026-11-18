@@ -1,7 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
-import { cn } from "@/lib/utils";
 import { Logo } from "@/components/Logo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,23 +15,6 @@ import {
 } from "@/components/ui/card";
 import { loginApi, ApiError } from "@/lib/api";
 import type { User } from "@/types/user";
-
-const DEMO_ACCOUNTS = [
-  {
-    company: "BioGenAI Solutions",
-    username: "ernest",
-    password: "Password1",
-    email: "ernest.bonat@gmail.com",
-    userId: 1,
-  },
-  {
-    company: "ABC Construction",
-    username: "abcusername",
-    password: "abcpassword",
-    email: "ernest.bonat@biogenaisolutions.com",
-    userId: 2,
-  },
-];
 
 interface LoginPageProps {
   onLogin: (user: User) => void;
@@ -66,12 +48,6 @@ export function LoginPage({ onLogin }: LoginPageProps) {
     }
   }
 
-  function fillAccount(acc: typeof DEMO_ACCOUNTS[number]) {
-    setUsername(acc.username);
-    setPassword(acc.password);
-    setError("");
-  }
-
   return (
     <div className="relative flex min-h-svh items-center justify-center overflow-hidden p-6 bg-muted/20">
       <div className="relative flex w-full max-w-sm flex-col items-center gap-8">
@@ -94,7 +70,7 @@ export function LoginPage({ onLogin }: LoginPageProps) {
                   id="username"
                   type="text"
                   autoComplete="username"
-                  placeholder="ernest or ernest.bonat@gmail.com"
+                  placeholder="Enter your username or email"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   aria-invalid={Boolean(error)}
@@ -178,39 +154,6 @@ export function LoginPage({ onLogin }: LoginPageProps) {
             </form>
           </CardContent>
         </Card>
-
-        <div
-          className={cn(
-            "w-full rounded-lg border border-border bg-muted/40 p-3.5 text-xs text-muted-foreground space-y-2.5",
-          )}
-        >
-          <div className="text-center font-medium text-foreground/80">Trial Access Accounts</div>
-
-          {DEMO_ACCOUNTS.map((acc) => (
-            <div
-              key={acc.userId}
-              className="rounded-md border border-border/60 bg-background/60 p-2.5 transition-colors hover:border-primary/40"
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-foreground">{acc.company}</span>
-                <span className="text-[10px] text-muted-foreground">User ID: {acc.userId}</span>
-              </div>
-              <p className="mt-1 text-[11px]">
-                User: <span className="font-medium text-foreground">{acc.username}</span> &middot; Pass: <span className="font-medium text-foreground">{acc.password}</span>
-              </p>
-              <p className="text-[10px] text-muted-foreground">
-                {acc.email} &middot; Exp: Dec 31, 2027
-              </p>
-              <button
-                type="button"
-                onClick={() => fillAccount(acc)}
-                className="mt-1.5 inline-block text-[11px] font-medium text-primary hover:underline"
-              >
-                Autofill {acc.company} &rarr;
-              </button>
-            </div>
-          ))}
-        </div>
       </div>
     </div>
   );
