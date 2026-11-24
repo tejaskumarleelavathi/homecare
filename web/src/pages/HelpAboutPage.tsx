@@ -158,7 +158,7 @@ const FAQS = [
   },
   {
     q: "Does the application work on mobile devices and tablets?",
-    a: "Yes! HomeCare is built with a responsive design. On smartphones and tablets, camera inputs let inspectors take photos live on site, update statuses, and view checklists seamlessly.",
+    a: "Yes! Home Care is built with a responsive design. On smartphones and tablets, camera inputs let inspectors take photos live on site, update statuses, and view checklists seamlessly.",
   },
 ];
 

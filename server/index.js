@@ -669,7 +669,7 @@ app.get("/api/homes/:homeId/inspections/:date/pdf", async (req, res) => {
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="HomeCare_Inspection_${dateStr}.pdf"`
+      `attachment; filename="Home_Care_Inspection_${dateStr}.pdf"`
     );
     res.send(pdfBuffer);
   } catch (err) {

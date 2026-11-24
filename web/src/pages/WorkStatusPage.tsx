@@ -45,7 +45,7 @@ export function WorkStatusPage() {
       setLoadError(
         err instanceof ApiError
           ? err.message
-          : "Couldn't reach the homecare API. Is the server running on port 4000?",
+          : "Couldn't reach the Home Care API. Is the server running on port 4000?",
       );
     } finally {
       setIsLoading(false);

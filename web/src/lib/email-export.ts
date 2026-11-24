@@ -20,11 +20,11 @@ export function sendInspectionEmail(
     : "Home Inspection";
   const dateFormatted = formatDateStr(dayView.date);
 
-  const subject = `${companyName} HomeCare Inspection Report - ${home ? home.street : "Property"} (${dateFormatted})`;
+  const subject = `${companyName} Home Care Inspection Report - ${home ? home.street : "Property"} (${dateFormatted})`;
 
   const body = `Hello,
 
-Please find the HomeCare Inspection Report details for your property below:
+Please find the Home Care Inspection Report details for your property below:
 
 Property: ${addressStr}
 Inspection Date: ${dateFormatted}
