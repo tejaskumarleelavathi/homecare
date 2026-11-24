@@ -46,6 +46,7 @@ import {
   backfillMissingSchedules,
 } from "./db.js";
 import { sendInspectionReportEmail, sendSupportTicketEmail } from "./email.js";
+import { generateInspectionPdfBuffer } from "./pdf.js";
 
 const app = express();
 app.use(cors());
@@ -180,7 +181,7 @@ function normalizeHomeInput(body) {
   const city = String(body.city ?? "").trim();
   const state = String(body.state ?? "").trim().toUpperCase();
   const zip_code = String(body.zip_code ?? "").trim();
-  const emails = String(body.emails ?? "").trim();
+  const rawEmails = String(body.emails ?? "").trim();
   const notes = String(body.notes ?? "").trim();
 
   const errors = [];
@@ -189,7 +190,31 @@ function normalizeHomeInput(body) {
   if (state.length !== 2) errors.push("State must be a 2-letter code.");
   if (!zip_code) errors.push("Zip code is required.");
 
-  return { errors, values: { street, city, state, zip_code, emails, notes } };
+  let cleanEmails = "";
+  if (rawEmails) {
+    const tokens = rawEmails.split(/[,;]+/).map((t) => t.trim()).filter(Boolean);
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const invalidTokens = [];
+    const validTokens = [];
+
+    for (const token of tokens) {
+      if (token.includes(" ") || !emailRegex.test(token)) {
+        invalidTokens.push(token);
+      } else {
+        validTokens.push(token.toLowerCase());
+      }
+    }
+
+    if (invalidTokens.length > 0) {
+      errors.push(
+        `Invalid email address or delimiter: "${invalidTokens.join(", ")}". Please separate multiple email addresses using commas (e.g. client1@example.com, client2@example.com).`
+      );
+    } else {
+      cleanEmails = validTokens.join(", ");
+    }
+  }
+
+  return { errors, values: { street, city, state, zip_code, emails: cleanEmails, notes } };
 }
 
 app.get("/api/homes", async (req, res) => {
@@ -590,6 +615,65 @@ app.post("/api/homes/:homeId/inspections/:date/send-email", async (req, res) => 
     res.json(result);
   } catch (err) {
     res.status(400).json({ errors: [err.message || "Failed to send email."] });
+  }
+});
+
+app.get("/api/homes/:homeId/inspections/:date/pdf", async (req, res) => {
+  const homeId = Number(req.params.homeId);
+  const dateStr = req.params.date;
+
+  const homeResult = await pool.query(
+    `SELECT ${HOME_COLUMNS.join(", ")} FROM home WHERE home_id = $1`,
+    [homeId]
+  );
+  if (homeResult.rows.length === 0) {
+    return res.status(404).json({ errors: ["Home not found."] });
+  }
+  const home = homeResult.rows[0];
+
+  const items = await getInspectionRows(homeId, dateStr);
+  if (items.length === 0) {
+    return res.status(404).json({ errors: ["No inspection found for this date."] });
+  }
+
+  const statusesResult = await pool.query(
+    `SELECT ${WORK_STATUS_COLUMNS.join(", ")} FROM work_status`
+  );
+  const statusesMap = new Map();
+  for (const s of statusesResult.rows) {
+    statusesMap.set(s.work_status_id, s.status_name);
+  }
+
+  let companyName = "BioGenAI Solutions";
+  let companyEmail = "ernest.bonat@gmail.com";
+  if (home.user_id) {
+    const userRes = await pool.query(
+      "SELECT company_name, email FROM users WHERE user_id = $1",
+      [home.user_id]
+    );
+    if (userRes.rows.length > 0) {
+      companyName = userRes.rows[0].company_name || companyName;
+      companyEmail = userRes.rows[0].email || companyEmail;
+    }
+  }
+
+  try {
+    const pdfBuffer = await generateInspectionPdfBuffer({
+      home,
+      dateStr,
+      items,
+      statusesMap,
+      companyName,
+      companyEmail,
+    });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="HomeCare_Inspection_${dateStr}.pdf"`
+    );
+    res.send(pdfBuffer);
+  } catch (err) {
+    res.status(500).json({ errors: [err.message || "Failed to generate PDF."] });
   }
 });
 

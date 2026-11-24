@@ -1,5 +1,17 @@
 import { Resend } from "resend";
 import nodemailer from "nodemailer";
+import { generateInspectionPdfBuffer } from "./pdf.js";
+
+export function parseEmailList(rawEmails) {
+  if (!rawEmails) return [];
+  if (Array.isArray(rawEmails)) {
+    return rawEmails.flatMap((e) => parseEmailList(e));
+  }
+  return String(rawEmails)
+    .split(/[,;]+/)
+    .map((e) => e.trim())
+    .filter((e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e));
+}
 
 function escapeHtml(str) {
   if (!str) return "";
@@ -394,30 +406,59 @@ export async function sendInspectionReportEmail({
   companyName = "BioGenAI Solutions",
   companyEmail = "ernest.bonat@gmail.com",
 }) {
-  // Use recipient specified, or target home's listed emails
-  const targetEmail = (recipientEmail || home?.emails || "").trim();
-  if (!targetEmail) {
-    throw new Error("No recipient email address available for this home.");
+  // Collect all recipient addresses: house emails, company email, and any manual recipientEmail
+  const recipientsSet = new Set();
+
+  // 1. House emails (supports comma or semicolon separated)
+  const houseEmails = parseEmailList(home?.emails);
+  for (const email of houseEmails) {
+    recipientsSet.add(email.toLowerCase());
+  }
+
+  // 2. Company owner email
+  if (companyEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(companyEmail.trim())) {
+    recipientsSet.add(companyEmail.trim().toLowerCase());
+  }
+
+  // 3. Manual recipient if passed
+  if (recipientEmail) {
+    const manualEmails = parseEmailList(recipientEmail);
+    for (const email of manualEmails) {
+      recipientsSet.add(email.toLowerCase());
+    }
+  }
+
+  const uniqueRecipients = Array.from(recipientsSet);
+  if (uniqueRecipients.length === 0) {
+    throw new Error("No valid recipient email address found in the house record or company profile.");
   }
 
   const dateFormatted = formatDateStr(dateStr);
   const addressStr = home ? `${home.street}, ${home.city}, ${home.state} ${home.zip_code}` : "Property";
   const subject = `${companyName} HomeCare Inspection Report - ${home ? home.street : "Property"} (${dateFormatted})`;
 
-  // Generate exact HTML document matching export view 100%
-  const exactReportHtml = buildExactInspectionReportHtml({ home, dateStr, items, statusesMap, companyName });
+  // Generate official PDF document attachment
+  const pdfBuffer = await generateInspectionPdfBuffer({
+    home,
+    dateStr,
+    items,
+    statusesMap,
+    companyName,
+    companyEmail,
+  });
 
   const emailCoverHtml = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b; line-height: 1.5; padding: 24px; max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 12px rgba(0,0,0,0.05);">
       <h2 style="color: #0f172a; margin-top: 0; border-bottom: 2px solid #0f172a; padding-bottom: 12px; font-size: 20px;">${escapeHtml(companyName)} Inspection Report</h2>
       <p style="font-size: 14px; color: #334155;">Hello,</p>
-      <p style="font-size: 14px; color: #334155;">Please find attached the official HomeCare Inspection Report for your property:</p>
+      <p style="font-size: 14px; color: #334155;">Please find attached the official PDF HomeCare Inspection Report for your property:</p>
       <div style="background-color: #f1f5f9; padding: 14px 18px; border-radius: 8px; margin: 16px 0; font-size: 13px;">
         <div style="font-weight: 700; color: #0f172a; font-size: 15px; margin-bottom: 4px;">${escapeHtml(addressStr)}</div>
         <div style="color: #475569;"><strong>Inspection Date:</strong> ${escapeHtml(dateFormatted)}</div>
         <div style="color: #475569; margin-top: 2px;"><strong>Total Checklist Items:</strong> ${items.length}</div>
+        <div style="color: #475569; margin-top: 2px;"><strong>Recipients:</strong> ${escapeHtml(uniqueRecipients.join(", "))}</div>
       </div>
-      <p style="font-size: 13px; color: #475569;">The attached report contains full property details, category items, status badges, photo evidence, and complete item notes.</p>
+      <p style="font-size: 13px; color: #475569;">The attached PDF report contains complete property information, inspection category items, status badges, photo evidence, and inspector notes.</p>
       <br/>
       <p style="font-size: 13px; color: #475569; border-top: 1px solid #e2e8f0; padding-top: 14px; margin-bottom: 0;">
         Best regards,<br/>
@@ -443,13 +484,13 @@ export async function sendInspectionReportEmail({
             email: process.env.BREVO_SENDER_EMAIL || "kltejas5@gmail.com",
           },
           replyTo: companyEmail ? { email: companyEmail, name: companyName } : undefined,
-          to: [{ email: targetEmail }],
+          to: uniqueRecipients.map((email) => ({ email })),
           subject: subject,
           htmlContent: emailCoverHtml,
           attachment: [
             {
-              name: `HomeCare_Inspection_${dateStr}.html`,
-              content: Buffer.from(exactReportHtml).toString("base64"),
+              name: `HomeCare_Inspection_${dateStr}.pdf`,
+              content: pdfBuffer.toString("base64"),
             },
           ],
         }),
@@ -464,10 +505,9 @@ export async function sendInspectionReportEmail({
         }
         throw new Error(data.message || `Brevo email delivery error (${res.status})`);
       }
-      return { success: true, provider: "Brevo", details: data, recipient: targetEmail };
+      return { success: true, provider: "Brevo", details: data, recipient: uniqueRecipients.join(", ") };
     } catch (brevoErr) {
       console.error("Brevo delivery exception:", brevoErr);
-      // If Resend is also configured, let it try falling back instead of dying immediately
       if (!process.env.RESEND_API_KEY) {
         throw brevoErr;
       }
@@ -481,13 +521,13 @@ export async function sendInspectionReportEmail({
       const fromEmail = process.env.RESEND_FROM_EMAIL || "ABC HomeCare <onboarding@resend.dev>";
       const response = await resend.emails.send({
         from: fromEmail,
-        to: targetEmail,
+        to: uniqueRecipients,
         subject,
         html: emailCoverHtml,
         attachments: [
           {
-            filename: `HomeCare_Inspection_${dateStr}.html`,
-            content: Buffer.from(exactReportHtml).toString("base64"),
+            filename: `HomeCare_Inspection_${dateStr}.pdf`,
+            content: pdfBuffer,
           },
         ],
       });
@@ -495,7 +535,7 @@ export async function sendInspectionReportEmail({
         console.error("Resend API returned error:", response.error);
         throw new Error(response.error.message || "Resend email delivery failed.");
       }
-      return { success: true, provider: "Resend", details: response.data, recipient: targetEmail };
+      return { success: true, provider: "Resend", details: response.data, recipient: uniqueRecipients.join(", ") };
     } catch (resendErr) {
       console.error("Resend delivery exception:", resendErr);
       throw resendErr;
@@ -516,24 +556,25 @@ export async function sendInspectionReportEmail({
     });
 
     const info = await transporter.sendMail({
-      from: `"ABC Constructions" <${process.env.SMTP_FROM || "info@abcconstructions.com"}>`,
-      to: targetEmail,
+      from: `"${companyName}" <${process.env.SMTP_FROM || "info@abcconstructions.com"}>`,
+      to: uniqueRecipients.join(", "),
       subject,
       html: emailCoverHtml,
       attachments: [
         {
-          filename: `HomeCare_Inspection_${dateStr}.html`,
-          content: exactReportHtml,
+          filename: `HomeCare_Inspection_${dateStr}.pdf`,
+          content: pdfBuffer,
+          contentType: "application/pdf",
         },
       ],
     });
-    return { success: true, provider: "SMTP", details: info, recipient: targetEmail };
+    return { success: true, provider: "SMTP", details: info, recipient: uniqueRecipients.join(", ") };
   }
 
   return {
     success: true,
     provider: "Simulated Email Dispatch",
-    recipient: targetEmail,
+    recipient: uniqueRecipients.join(", "),
   };
 }
 

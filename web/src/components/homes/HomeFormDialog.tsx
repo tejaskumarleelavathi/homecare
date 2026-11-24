@@ -87,6 +87,19 @@ export function HomeFormDialog({ open, onOpenChange, home, onSaved }: HomeFormDi
       return;
     }
 
+    if (payload.emails) {
+      const tokens = payload.emails.split(/[,;]+/).map((t) => t.trim()).filter(Boolean);
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const invalid = tokens.filter((t) => t.includes(" ") || !emailRegex.test(t));
+      if (invalid.length > 0) {
+        setError(
+          `Invalid email address or delimiter: "${invalid.join(", ")}". Please separate multiple emails with commas (e.g. client1@example.com, client2@example.com).`
+        );
+        return;
+      }
+      payload.emails = tokens.join(", ");
+    }
+
     setIsSubmitting(true);
     setError("");
     try {
@@ -161,14 +174,16 @@ export function HomeFormDialog({ open, onOpenChange, home, onSaved }: HomeFormDi
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="home-emails">Emails</Label>
+              <Label htmlFor="home-emails">Contact Emails</Label>
               <Input
                 id="home-emails"
-                placeholder="owner@homecare.com;second@homecare.com"
+                placeholder="client1@example.com, client2@example.com"
                 value={form.emails}
                 onChange={(e) => updateField("emails", e.target.value)}
               />
-              <p className="text-xs text-muted-foreground">Separate multiple emails with a semicolon.</p>
+              <p className="text-xs text-muted-foreground">
+                For multiple recipients, separate with commas (e.g. client1@example.com, client2@example.com).
+              </p>
             </div>
 
             <div className="space-y-2">

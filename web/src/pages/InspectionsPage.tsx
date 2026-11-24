@@ -29,7 +29,6 @@ import {
   uploadInspectionPhoto,
 } from "@/lib/api";
 import { fromDateStr, formatDateStr, toDateStr, todayStr } from "@/lib/date";
-import { exportInspectionPdf } from "@/lib/pdf-export";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -158,6 +157,12 @@ export function InspectionsPage() {
     }
   }
 
+  function handleExportPdf() {
+    if (selectedHomeId === null || !dayView) return;
+    const url = `/api/homes/${selectedHomeId}/inspections/${dayView.date}/pdf`;
+    window.open(url, "_blank");
+  }
+
   async function handleSendEmail() {
     if (selectedHomeId === null || !dayView) return;
     setEmailSending(true);
@@ -166,9 +171,8 @@ export function InspectionsPage() {
     try {
       const res = await sendInspectionReportEmailApi(selectedHomeId, dayView.date);
       setEmailSuccessMsg(
-        `Inspection report email dispatched successfully to ${res.recipient}!`
+        `Inspection report PDF dispatched successfully to: ${res.recipient}!`
       );
-      exportInspectionPdf(selectedHome, dayView, statuses);
     } catch (err) {
       setActionError(
         err instanceof ApiError ? err.message : "Couldn't send inspection email."
@@ -278,7 +282,7 @@ export function InspectionsPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Inspections</h1>
         {dayView && dayView.items.length > 0 && (
           <div className="flex items-center gap-2">
-            <Button type="button" variant="outline" onClick={() => exportInspectionPdf(selectedHome, dayView, statuses)}>
+            <Button type="button" variant="outline" onClick={handleExportPdf}>
               <Printer className="size-4" />
               Export PDF
             </Button>
