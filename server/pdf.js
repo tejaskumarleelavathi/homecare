@@ -156,33 +156,45 @@ export async function generateInspectionPdfBuffer({
       doc.y = catY + 26;
 
       for (const item of categoryItems) {
-        checkPageBreak(65);
-
-        const itemStartY = doc.y;
+        const title = item.category_item || "Inspection Item";
+        const desc = item.category_description ? item.category_description.trim() : "";
         const statusName = item.work_status_id
           ? statusesMap.get(item.work_status_id) || "Pending"
           : "Pending";
         const badgeColors = getStatusBadgeColors(statusName);
 
-        // Item title
-        doc.fillColor("#0f172a").fontSize(10).font("Helvetica-Bold").text(
-          item.category_item || "Inspection Item",
-          44,
-          itemStartY,
-          { width: 330 }
-        );
+        const itemPhotos = [
+          item.work_photo_pah_1,
+          item.work_photo_pah_2,
+          item.work_photo_pah_3,
+        ].filter(Boolean);
 
-        // Item description if present
-        if (item.category_description) {
-          doc.fillColor("#64748b").fontSize(8.5).font("Helvetica").text(
-            item.category_description,
-            44,
-            doc.y + 1,
-            { width: 330 }
-          );
+        // Pre-measure title & description heights to prevent any text clipping or overlap
+        doc.fontSize(10).font("Helvetica-Bold");
+        const titleHeight = doc.heightOfString(title, { width: 400 });
+
+        let descHeight = 0;
+        if (desc) {
+          doc.fontSize(8.5).font("Helvetica");
+          descHeight = doc.heightOfString(desc, { width: 400 });
         }
 
-        // Status badge pill on right
+        const textBlockHeight = titleHeight + (desc ? 2 + descHeight : 0);
+        const headerBlockHeight = Math.max(textBlockHeight, 18);
+
+        // Calculate total space needed for page break check
+        let requiredItemHeight = headerBlockHeight + 14;
+        if (itemPhotos.length > 0) requiredItemHeight += 52;
+        if (item.notes && item.notes.trim()) {
+          doc.fontSize(8.5).font("Helvetica");
+          requiredItemHeight += doc.heightOfString(item.notes.trim(), { width: contentWidth - 24 }) + 14;
+        }
+
+        checkPageBreak(requiredItemHeight);
+
+        const itemStartY = doc.y;
+
+        // 1. Draw status badge pill on right first so its cursor advance does not clobber left text
         const badgeX = pageWidth - 145;
         const badgeY = itemStartY;
         doc.roundedRect(badgeX, badgeY, 95, 16, 4).fillAndStroke(badgeColors.bg, badgeColors.border);
@@ -190,22 +202,34 @@ export async function generateInspectionPdfBuffer({
           statusName.toUpperCase(),
           badgeX,
           badgeY + 4,
-          { width: 95, align: "center" }
+          { width: 95, align: "center", lineBreak: false }
         );
 
-        // Photos row if photos exist
-        const itemPhotos = [
-          item.work_photo_pah_1,
-          item.work_photo_pah_2,
-          item.work_photo_pah_3,
-        ].filter(Boolean);
+        // 2. Draw Item title on left
+        doc.fillColor("#0f172a").fontSize(10).font("Helvetica-Bold").text(
+          title,
+          44,
+          itemStartY,
+          { width: 400 }
+        );
 
-        doc.y = Math.max(doc.y, itemStartY + 20);
+        // 3. Draw Item description directly below title
+        if (desc) {
+          doc.fillColor("#64748b").fontSize(8.5).font("Helvetica").text(
+            desc,
+            44,
+            doc.y + 2,
+            { width: 400 }
+          );
+        }
 
+        // 4. Cursor position below both the left text block and right badge with a clean 6pt buffer
+        doc.y = Math.max(doc.y, badgeY + 18) + 6;
+
+        // 5. Photos row if photos exist
         if (itemPhotos.length > 0) {
-          checkPageBreak(55);
           let photoX = 44;
-          const photoY = doc.y + 3;
+          const photoY = doc.y;
           let hasRenderedPhoto = false;
 
           for (const pUrl of itemPhotos) {
@@ -223,21 +247,21 @@ export async function generateInspectionPdfBuffer({
           }
 
           if (hasRenderedPhoto) {
-            doc.y = photoY + 48;
+            doc.y = photoY + 50;
           }
         }
 
-        // Notes box if present
+        // 6. Notes box if present
         if (item.notes && item.notes.trim()) {
-          checkPageBreak(30);
-          const noteY = doc.y + 2;
+          const noteY = doc.y;
           const noteText = item.notes.trim();
           doc.fontSize(8.5).font("Helvetica");
-          const noteHeight = doc.heightOfString(noteText, { width: contentWidth - 24 }) + 8;
+          const noteTextHeight = doc.heightOfString(noteText, { width: contentWidth - 24 });
+          const boxHeight = noteTextHeight + 8;
 
-          doc.rect(44, noteY, contentWidth - 8, noteHeight).fillAndStroke("#f1f5f9", "#e2e8f0");
+          doc.rect(44, noteY, contentWidth - 8, boxHeight).fillAndStroke("#f1f5f9", "#e2e8f0");
           // Blue left accent line
-          doc.rect(44, noteY, 3, noteHeight).fill("#2563eb");
+          doc.rect(44, noteY, 3, boxHeight).fill("#2563eb");
 
           doc.fillColor("#0f172a").fontSize(8.5).font("Helvetica").text(
             noteText,
@@ -245,12 +269,10 @@ export async function generateInspectionPdfBuffer({
             noteY + 4,
             { width: contentWidth - 24 }
           );
-          doc.y = noteY + noteHeight + 6;
-        } else {
-          doc.y += 4;
+          doc.y = noteY + boxHeight + 6;
         }
 
-        // Item subtle divider
+        // 7. Item subtle divider
         doc.strokeColor("#e2e8f0").lineWidth(0.5).moveTo(40, doc.y).lineTo(pageWidth - 40, doc.y).stroke();
         doc.y += 6;
       }
