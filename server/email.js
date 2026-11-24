@@ -589,11 +589,9 @@ export async function sendInspectionReportEmail({
     return { success: true, provider: "SMTP", details: info, recipient: uniqueRecipients.join(", ") };
   }
 
-  return {
-    success: true,
-    provider: "Simulated Email Dispatch",
-    recipient: uniqueRecipients.join(", "),
-  };
+  throw new Error(
+    "Email delivery failed: No active email service configured. Please add BREVO_API_KEY (or RESEND_API_KEY) to your Render Dashboard Environment Variables."
+  );
 }
 
 export async function sendSupportTicketEmail({ name, email, topic, message }) {
