@@ -471,32 +471,50 @@ export async function sendInspectionReportEmail({
   // 1. Brevo REST API Transport
   if (process.env.BREVO_API_KEY) {
     try {
-      const res = await fetch("https://api.brevo.com/v3/smtp/email", {
-        method: "POST",
-        headers: {
-          "accept": "application/json",
-          "content-type": "application/json",
-          "api-key": process.env.BREVO_API_KEY.trim(),
-        },
-        body: JSON.stringify({
-          sender: {
-            name: `${companyName} via Home Care`,
-            email: process.env.BREVO_SENDER_EMAIL || "kltejas5@gmail.com",
-          },
-          replyTo: companyEmail ? { email: companyEmail, name: companyName } : undefined,
-          to: uniqueRecipients.map((email) => ({ email })),
-          subject: subject,
-          htmlContent: emailCoverHtml,
-          attachment: [
-            {
-              name: `HomeCare_Inspection_${dateStr}.pdf`,
-              content: pdfBuffer.toString("base64"),
-            },
-          ],
-        }),
-      });
+      const fallbackSender = process.env.BREVO_SENDER_EMAIL || "kltejas5@gmail.com";
+      const preferredSender = companyEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(companyEmail.trim())
+        ? companyEmail.trim().toLowerCase()
+        : fallbackSender;
 
-      const data = await res.json();
+      async function callBrevoApi(senderAddress) {
+        return fetch("https://api.brevo.com/v3/smtp/email", {
+          method: "POST",
+          headers: {
+            "accept": "application/json",
+            "content-type": "application/json",
+            "api-key": process.env.BREVO_API_KEY.trim(),
+          },
+          body: JSON.stringify({
+            sender: {
+              name: `${companyName} via Home Care`,
+              email: senderAddress,
+            },
+            replyTo: companyEmail ? { email: companyEmail, name: companyName } : undefined,
+            to: uniqueRecipients.map((email) => ({ email })),
+            subject: subject,
+            htmlContent: emailCoverHtml,
+            attachment: [
+              {
+                name: `HomeCare_Inspection_${dateStr}.pdf`,
+                content: pdfBuffer.toString("base64"),
+              },
+            ],
+          }),
+        });
+      }
+
+      // Try sending with the company's own verified email first
+      let res = await callBrevoApi(preferredSender);
+      let data = await res.json();
+
+      // If Brevo rejected because preferredSender is not an active verified sender in the account,
+      // gracefully retry using the verified master fallback sender address
+      if (!res.ok && preferredSender !== fallbackSender && (res.status === 400 || (data.message && String(data.message).toLowerCase().includes("sender")))) {
+        console.warn(`Sender ${preferredSender} is not yet verified in Brevo. Retrying with fallback sender ${fallbackSender}...`);
+        res = await callBrevoApi(fallbackSender);
+        data = await res.json();
+      }
+
       if (!res.ok) {
         if (res.status === 401 || data.message === "Key not found") {
           throw new Error(
